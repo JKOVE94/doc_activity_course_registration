@@ -1,1 +1,78 @@
-# doc_activity_-course_registration
+# 연합목장 공통사 수강신청
+
+청년부 연합목장모임 공통사 부스 **선착순 수강신청** 웹 서비스.
+동시 접속 80~100명 규모에서 정원 초과 없이 안전하게 신청을 처리합니다.
+
+- **Frontend**: Next.js 16 (App Router) · React 19 · Tailwind CSS v4 · lucide-react
+- **Backend/DB**: Next.js Route Handlers + Supabase (PostgreSQL)
+- **배포**: Vercel
+
+## 화면
+
+| 경로 | 설명 |
+|---|---|
+| `/` | 간이 로그인 (목장 선택 + 이름). 우하단 `관리자 모드` 링크 |
+| `/booths` | 부스 소개 (강사/설명/장소/준비물/정원) |
+| `/register` | 실시간 수강신청 — 정원 현황, 프로그레스 바, 1인 1클래스 |
+| `/admin` | 관리자 대시보드 — 상태 토글 / 명단 / CSV / 전체 초기화 |
+
+## 동시성(Race Condition) 처리
+
+`register_for_class()` DB 함수가 대상 클래스 row 를 `SELECT ... FOR UPDATE` 로 잠급니다.
+같은 부스에 대한 동시 신청은 DB 레벨에서 직렬화되므로, 정원이 1자리 남은 상태에서
+여러 명이 동시에 눌러도 **초과 신청이 발생하지 않습니다.**
+`registrations (ranch_name, user_name)` 유니크 인덱스가 1인 1클래스를 추가로 강제합니다.
+
+모든 쓰기는 서버 API Route(`service_role`)를 거쳐 DB 함수로만 실행되며,
+클라이언트는 테이블을 읽고 Realtime 구독만 합니다 (RLS 로 직접 쓰기 차단).
+
+## 로컬 실행
+
+### 1. Supabase 프로젝트 생성
+1. <https://supabase.com/dashboard> 에서 새 프로젝트 생성
+2. **SQL Editor** → `supabase/migrations/0001_init.sql` 전체 실행
+3. (선택) `supabase/seed.sql` 실행해 샘플 부스 6개 삽입
+4. 관리자 비밀번호 변경:
+   ```sql
+   update public.admin_secret set password = '원하는비밀번호' where id = 1;
+   ```
+5. **Database → Replication** 에서 `classes`, `app_settings`, `registrations` 가
+   `supabase_realtime` publication 에 포함됐는지 확인 (마이그레이션이 자동 추가)
+
+### 2. 환경변수
+`.env.local` 에 **Project Settings → API** 값 입력:
+```
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+### 3. 개발 서버
+```bash
+npm install
+npm run dev        # http://localhost:3000
+```
+
+## Vercel 배포
+
+```bash
+npm i -g vercel        # 최초 1회
+vercel login
+vercel link            # 프로젝트 연결/생성
+# 환경변수 3개 등록 (Production + Preview + Development)
+vercel env add NEXT_PUBLIC_SUPABASE_URL
+vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY
+vercel env add SUPABASE_SERVICE_ROLE_KEY
+vercel --prod
+```
+
+또는 GitHub 저장소를 Vercel 대시보드에서 Import → Environment Variables 3개 입력 → Deploy.
+이후 `main` 브랜치 push 시 자동 배포됩니다.
+
+## 운영 순서 (행사 당일)
+
+1. 관리자 `/admin` 접속 → 상태 **대기**
+2. 청년들 로그인 후 `/booths` 에서 부스 확인 (신청 버튼은 비활성)
+3. 시작 시각에 관리자가 **오픈** → 실시간 신청 진행
+4. 마감 후 관리자가 **종료** → **CSV 다운로드**
+5. 다음 행사 전 **전체 초기화**
