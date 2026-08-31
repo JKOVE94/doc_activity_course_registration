@@ -37,7 +37,9 @@ function AdminInner() {
   const [capacityPerClass, setCapacityPerClass] = useState<number | null>(null);
   const [attendeeTotal, setAttendeeTotal] = useState(0);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [confirmSeed, setConfirmSeed] = useState(false);
+  const [confirmSeed, setConfirmSeed] = useState<
+    "classes" | "full" | "lastseat" | null
+  >(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [working, setWorking] = useState(false);
 
@@ -202,12 +204,13 @@ function AdminInner() {
   };
 
   const doSeed = async () => {
+    if (!confirmSeed) return;
     setWorking(true);
     try {
       const res = await fetch("/api/admin/seed", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pw }),
+        body: JSON.stringify({ password: pw, scenario: confirmSeed }),
       });
       const text = await res.text();
       let j: Record<string, unknown>;
@@ -219,12 +222,18 @@ function AdminInner() {
       }
       if (j.ok) {
         touchAdminSession();
-        setConfirmSeed(false);
+        setConfirmSeed(null);
         await load();
         alert(
-          `테스트 데이터 생성 완료 — 부스 ${j.classes ?? 0}개, 로그인 ${
-            j.attendees ?? 0
-          }명, 신청 ${j.registrations ?? 0}건`,
+          j.scenario === "classes"
+            ? `테스트 부스 ${j.classes ?? 0}개 생성 완료`
+            : j.scenario === "lastseat"
+              ? `분반당 1자리 시나리오 생성 완료 — 부스 ${j.classes ?? 0}개, 로그인 ${
+                  j.attendees ?? 0
+                }명, 신청 ${j.registrations ?? 0}건.\n테스터 로그인 후 '오픈'하면 분반당 정원 2명 중 1자리가 남습니다.`
+              : `테스트 데이터 생성 완료 — 부스 ${j.classes ?? 0}개, 로그인 ${
+                  j.attendees ?? 0
+                }명, 신청 ${j.registrations ?? 0}건`,
         );
       } else {
         alert(
@@ -438,14 +447,34 @@ function AdminInner() {
         <section className="rounded-2xl bg-amber-50 border border-amber-100 p-4">
           <h2 className="font-bold text-amber-700">테스트 도구</h2>
           <p className="text-xs text-amber-600/80 mt-0.5">
-            기존 데이터를 모두 지우고 샘플 부스 6개 + 가짜 로그인 인원 + 랜덤 신청을 생성합니다.
+            기존 데이터를 모두 지우고 샘플 데이터를 생성합니다.
           </p>
-          <button
-            onClick={() => setConfirmSeed(true)}
-            className="mt-3 flex items-center justify-center gap-1.5 h-11 w-full rounded-xl bg-amber-500 text-white font-semibold"
-          >
-            <FlaskConical size={15} /> 테스트 데이터 생성
-          </button>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setConfirmSeed("classes")}
+              className="flex items-center justify-center gap-1.5 h-11 rounded-xl bg-amber-100 text-amber-700 font-semibold text-sm"
+            >
+              <FlaskConical size={14} /> 부스만 생성
+            </button>
+            <button
+              onClick={() => setConfirmSeed("full")}
+              className="flex items-center justify-center gap-1.5 h-11 rounded-xl bg-amber-500 text-white font-semibold text-sm"
+            >
+              <FlaskConical size={14} /> 부스 + 참가자
+            </button>
+            <button
+              onClick={() => setConfirmSeed("lastseat")}
+              className="col-span-2 flex items-center justify-center gap-1.5 h-11 rounded-xl bg-amber-100 text-amber-700 font-semibold text-sm"
+            >
+              <FlaskConical size={14} /> 분반당 1자리 남김 (테스터 4명용)
+            </button>
+          </div>
+          <p className="mt-2 text-[11px] text-amber-600/70">
+            · 부스만: 샘플 부스 6개 (참가자·신청 없음)
+            <br />· 부스 + 참가자: 부스 6개 + 가짜 로그인 40명 + 랜덤 신청 약 60%
+            <br />· 분반당 1자리: 부스 6개 + 가짜 로그인 8명, 정원 2 중 1명 신청.
+            테스터가 로그인 후 오픈하면 마지막 1자리 선착순을 테스트할 수 있음
+          </p>
         </section>
 
         <section className="rounded-2xl bg-red-50 border border-red-100 p-4">
@@ -524,13 +553,20 @@ function AdminInner() {
       {confirmSeed && (
         <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center px-5">
           <div className="w-full max-w-xs rounded-2xl bg-white p-5">
-            <p className="font-bold text-slate-800">테스트 데이터를 생성할까요?</p>
+            <p className="font-bold text-slate-800">
+              {confirmSeed === "classes" ? "샘플 부스를 생성할까요?" : "테스트 데이터를 생성할까요?"}
+            </p>
             <p className="text-sm text-slate-500 mt-1">
-              <b>현재 부스·신청·로그인 인원이 모두 삭제</b>되고 샘플 데이터로 교체됩니다.
+              <b>현재 부스·신청·로그인 인원이 모두 삭제</b>되고{" "}
+              {confirmSeed === "classes"
+                ? "샘플 부스 6개만 생성됩니다."
+                : confirmSeed === "lastseat"
+                  ? "부스 6개 + 가짜 로그인 8명(분반당 1자리 남는 상태)으로 교체됩니다."
+                  : "샘플 부스 6개 + 가짜 참가자로 교체됩니다."}
             </p>
             <div className="mt-4 flex gap-2">
               <button
-                onClick={() => setConfirmSeed(false)}
+                onClick={() => setConfirmSeed(null)}
                 className="flex-1 h-10 rounded-xl bg-slate-100 font-semibold"
               >
                 취소
