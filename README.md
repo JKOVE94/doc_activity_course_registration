@@ -1,4 +1,4 @@
-# 연합목장 공통사 수강신청
+# 연합목장활동 공통사모임 신청
 
 청년부 연합목장모임 공통사 부스 **선착순 수강신청** 웹 서비스.
 동시 접속 80~100명 규모에서 정원 초과 없이 안전하게 신청을 처리합니다.
@@ -9,13 +9,15 @@
 
 ## 화면
 
-| 경로 | 설명 |
-|---|---|
-| `/` | 간이 로그인 (목장 선택 + 이름). 하단 `실시간 현황판` · `관리자 모드` 링크. 세션은 브라우저에 유지 |
-| `/booths` | 부스 소개 (담당자/설명/장소/준비물/사진) |
-| `/register` | 실시간 수강신청 — 정원 현황, 프로그레스 바, 1인 1부스. 오픈 전 `이름 변경` 가능 |
-| `/board` | 실시간 현황판 (인증 불필요, 큰 화면/프로젝터용) — 부스별 정원·신청 인원·신청자 명단 |
-| `/admin` | 관리자 대시보드 — 부스 관리(추가·수정·삭제, 사진 3장) / 상태 토글 / 명단 / CSV / 전체 초기화 |
+
+| 경로          | 설명                                                            |
+| ----------- | ------------------------------------------------------------- |
+| `/`         | 간이 로그인 (목장 선택 + 이름). 우하단 `관리자 모드` 링크                          |
+| `/booths`   | 부스 소개 (담당자/설명/장소/준비물/사진)                                      |
+| `/register` | 실시간 수강신청 — 정원 현황, 프로그레스 바, 1인 1부스                             |
+| `/board`    | 실시간 현황판 (인증 불필요, 큰 화면/프로젝터용) — 부스별 정원·신청 인원·신청자 명단            |
+| `/admin`    | 관리자 대시보드 — 부스 관리(추가·수정·삭제, 사진 3장) / 상태 토글 / 명단 / CSV / 전체 초기화 |
+
 
 ## 정원 산정
 
@@ -57,37 +59,42 @@ Vercel 에서 이 두 변수는 "Config"(비민감)로, `SUPABASE_SECRET_KEY` �
 ## 로컬 실행
 
 ### 1. Supabase 프로젝트 생성
-1. <https://supabase.com/dashboard> 에서 새 프로젝트 생성
+
+1. [https://supabase.com/dashboard](https://supabase.com/dashboard) 에서 새 프로젝트 생성
 2. **SQL Editor** → 마이그레이션을 순서대로 실행:
-   - `supabase/migrations/0001_init.sql`
-   - `supabase/migrations/0002_harden_rpc.sql` (0001 을 이미 예전 버전으로 돌린 경우만)
-   - `supabase/migrations/0003_class_management.sql` (부스 GUI 관리 + 사진 DB 저장)
-   - `supabase/migrations/0004_dynamic_capacity.sql` (정원 자동 산정 + 로그인 인원 기록)
-   - `supabase/migrations/0005_public_snapshot.sql` (공개 화면 통합 조회 함수 — 로딩 속도)
-   - `supabase/migrations/0006_safe_where.sql` (pg_safeupdate 대응 — reset/오픈 함수 WHERE 보강)
-   - `supabase/migrations/0007_reset_feedback.sql` (초기화 삭제 건수 반환)
-   - `supabase/migrations/0008_reset_scope_and_demo.sql` (초기화에 부스 포함 + 테스트 데이터 생성 함수)
-   - `supabase/migrations/0009_register_perf.sql` (신청/취소 동시성 최적화)
-   - `supabase/migrations/0010_attendee_rename.sql` (일반 유저 이름/목장 변경)
-3. 실제 부스는 관리자 페이지 &lsquo;부스 관리&rsquo;에서 추가. 테스트는 관리자 &lsquo;테스트 데이터 생성&rsquo; 버튼으로 샘플 세팅.
+  - `supabase/migrations/0001_init.sql`
+  - `supabase/migrations/0002_harden_rpc.sql` (0001 을 이미 예전 버전으로 돌린 경우만)
+  - `supabase/migrations/0003_class_management.sql` (부스 GUI 관리 + 사진 DB 저장)
+  - `supabase/migrations/0004_dynamic_capacity.sql` (정원 자동 산정 + 로그인 인원 기록)
+  - `supabase/migrations/0005_public_snapshot.sql` (공개 화면 통합 조회 함수 — 로딩 속도)
+  - `supabase/migrations/0006_safe_where.sql` (pg_safeupdate 대응 — reset/오픈 함수 WHERE 보강)
+  - `supabase/migrations/0007_reset_feedback.sql` (초기화 삭제 건수 반환)
+  - `supabase/migrations/0008_reset_scope_and_demo.sql` (초기화에 부스 포함 + 테스트 데이터 생성 함수)
+  - `supabase/migrations/0009_register_perf.sql` (신청/취소 동시성 최적화)
+  - `supabase/migrations/0010_attendee_rename.sql` (일반 유저 이름/목장 변경)
+3. 실제 부스는 관리자 페이지 &amp;lsquo;부스 관리&amp;rsquo;에서 추가. 테스트는 관리자 &amp;lsquo;테스트 데이터 생성&amp;rsquo; 버튼으로 샘플 세팅.
 4. 관리자 비밀번호 변경:
-   ```sql
+  ```sql
    update public.admin_secret set password = '원하는비밀번호' where id = 1;
-   ```
+  ```
 5. **Database → Replication** 에서 `classes`, `app_settings`, `registrations` 가
-   `supabase_realtime` publication 에 포함됐는지 확인 (마이그레이션이 자동 추가)
+supabase_realtime` publication 에 포함됐는지 확인 (마이그레이션이 자동 추가)
 
 ### 2. 환경변수
+
 `.env.local` 에 **Project Settings → API Keys**(Publishable and secret API keys 탭) 값 입력:
+
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 SUPABASE_SECRET_KEY=sb_secret_...
 ```
+
 > 레거시 키(`anon` / `service_role` JWT)를 쓰는 경우 `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
 > `SUPABASE_SERVICE_ROLE_KEY` 로 넣어도 코드가 fallback 처리한다.
 
 ### 3. 개발 서버
+
 ```bash
 npm install
 npm run dev        # http://localhost:3000
@@ -116,3 +123,4 @@ vercel --prod
 3. **전원 로그인 완료 후** 관리자가 **오픈** → 그 시점 인원으로 분반당 정원 확정, 실시간 신청 진행
 4. 마감 후 관리자가 **종료** → **CSV 다운로드**
 5. 다음 행사 전 **전체 초기화** (신청·로그인 인원·고정 정원 모두 리셋)
+
