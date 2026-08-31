@@ -1,25 +1,33 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapPin, User, Package, Users } from "lucide-react";
+import { MapPin, User, Package, Users, UserPlus } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
-import type { ClassRow } from "@/lib/types";
+import type { ClassRow, ClassImageMeta } from "@/lib/types";
 import TabNav from "@/components/TabNav";
+import ImageStrip from "@/components/ImageStrip";
 
 export default function BoothsPage() {
   const [rows, setRows] = useState<ClassRow[]>([]);
+  const [images, setImages] = useState<ClassImageMeta[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase
-      .from("classes")
-      .select("*")
-      .order("sort_order")
-      .then(({ data }) => {
-        setRows((data as ClassRow[]) ?? []);
-        setLoading(false);
-      });
+    Promise.all([
+      supabase.from("classes").select("*").order("sort_order"),
+      supabase
+        .from("class_image_meta")
+        .select("id, class_id, sort, content_type, byte_size")
+        .order("sort"),
+    ]).then(([cls, im]) => {
+      setRows((cls.data as ClassRow[]) ?? []);
+      setImages((im.data as ClassImageMeta[]) ?? []);
+      setLoading(false);
+    });
   }, []);
+
+  const imageIds = (classId: string) =>
+    images.filter((i) => i.class_id === classId).map((i) => i.id);
 
   return (
     <main className="min-h-dvh bg-slate-50">
@@ -31,18 +39,30 @@ export default function BoothsPage() {
 
         {loading && <p className="text-center text-slate-400 py-10">불러오는 중…</p>}
 
-        {rows.map((c) => (
-          <div key={c.id} className="rounded-2xl bg-white p-4 shadow-sm">
+        {rows.map((c) => {
+          const ids = imageIds(c.id);
+          return (
+          <div key={c.id} className="rounded-2xl bg-white p-4 shadow-sm overflow-hidden">
             <h3 className="font-bold text-slate-800 text-lg">{c.name}</h3>
+            {ids.length > 0 && (
+              <div className="mt-3">
+                <ImageStrip ids={ids} />
+              </div>
+            )}
             {c.description && (
-              <p className="text-sm text-slate-600 mt-1.5 whitespace-pre-line leading-relaxed">
+              <p className="text-sm text-slate-600 mt-3 whitespace-pre-line leading-relaxed">
                 {c.description}
               </p>
             )}
             <div className="mt-3 space-y-1.5 text-xs text-slate-500">
               <p className="flex items-center gap-1.5">
-                <User size={13} /> 강사 · {c.instructor}
+                <User size={13} /> 메인 · {c.instructor}
               </p>
+              {c.instructor_sub && (
+                <p className="flex items-center gap-1.5">
+                  <UserPlus size={13} /> 보조 · {c.instructor_sub}
+                </p>
+              )}
               {c.location && (
                 <p className="flex items-center gap-1.5">
                   <MapPin size={13} /> {c.location}
@@ -58,7 +78,8 @@ export default function BoothsPage() {
               </p>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </main>
   );

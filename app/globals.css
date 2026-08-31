@@ -23,3 +23,12 @@ textarea,
 button {
   font-size: 16px;
 }
+
+/* 가로 스크롤 스트립: 스크롤바 숨김 */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
