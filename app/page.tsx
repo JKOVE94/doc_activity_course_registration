@@ -44,7 +44,7 @@ export default function LoginPage() {
     <main className="min-h-dvh bg-slate-50 flex flex-col items-center justify-center px-5 py-10">
       <div className="w-full max-w-sm">
         <h1 className="text-2xl font-bold text-center text-slate-800">
-          연합목장 공통사 수강신청
+          연합목장활동 공통사모임 신청
         </h1>
         <p className="text-center text-slate-500 text-sm mt-1">
           목장과 이름을 입력하고 시작하세요
