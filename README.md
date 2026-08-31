@@ -23,7 +23,7 @@
 여러 명이 동시에 눌러도 **초과 신청이 발생하지 않습니다.**
 `registrations (ranch_name, user_name)` 유니크 인덱스가 1인 1클래스를 추가로 강제합니다.
 
-모든 쓰기는 서버 API Route(`service_role`)를 거쳐 DB 함수로만 실행되며,
+모든 쓰기는 서버 API Route(secret key)를 거쳐 DB 함수로만 실행되며,
 클라이언트는 테이블을 읽고 Realtime 구독만 합니다 (RLS 로 직접 쓰기 차단).
 
 ## 로컬 실행
@@ -40,12 +40,14 @@
    `supabase_realtime` publication 에 포함됐는지 확인 (마이그레이션이 자동 추가)
 
 ### 2. 환경변수
-`.env.local` 에 **Project Settings → API** 값 입력:
+`.env.local` 에 **Project Settings → API Keys**(Publishable and secret API keys 탭) 값 입력:
 ```
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
+NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+SUPABASE_SECRET_KEY=sb_secret_...
 ```
+> 레거시 키(`anon` / `service_role` JWT)를 쓰는 경우 `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+> `SUPABASE_SERVICE_ROLE_KEY` 로 넣어도 코드가 fallback 처리한다.
 
 ### 3. 개발 서버
 ```bash
@@ -61,8 +63,8 @@ vercel login
 vercel link            # 프로젝트 연결/생성
 # 환경변수 3개 등록 (Production + Preview + Development)
 vercel env add NEXT_PUBLIC_SUPABASE_URL
-vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY
-vercel env add SUPABASE_SERVICE_ROLE_KEY
+vercel env add NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+vercel env add SUPABASE_SECRET_KEY
 vercel --prod
 ```
 
