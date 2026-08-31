@@ -216,8 +216,8 @@ begin
   if not public.admin_verify(p_password) then
     return jsonb_build_object('ok', false, 'error', 'BAD_PASSWORD');
   end if;
-  delete from public.registrations;
-  update public.classes set current_count = 0;
+  delete from public.registrations where true;
+  update public.classes set current_count = 0 where current_count <> 0;
   update public.app_settings set status = 'CLOSED', updated_at = now() where id = 1;
   return jsonb_build_object('ok', true);
 end;

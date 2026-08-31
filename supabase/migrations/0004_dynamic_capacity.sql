@@ -77,7 +77,9 @@ begin
     -- 올림(ceil): 균등 분배 시 전원이 한 곳은 신청 가능하도록
     v_cap := greatest(ceil(v_attendees::numeric / v_classes)::int, 1);
 
-    update public.classes set max_capacity = v_cap;
+    update public.classes
+      set max_capacity = v_cap
+      where max_capacity is distinct from v_cap;
     update public.app_settings
       set status = 'OPEN',
           capacity_per_class = v_cap,
@@ -105,9 +107,9 @@ begin
   if not public.admin_verify(p_password) then
     return jsonb_build_object('ok', false, 'error', 'BAD_PASSWORD');
   end if;
-  delete from public.registrations;
-  delete from public.attendees;
-  update public.classes set current_count = 0;
+  delete from public.registrations where true;
+  delete from public.attendees    where true;
+  update public.classes set current_count = 0 where current_count <> 0;
   update public.app_settings
     set status = 'CLOSED',
         capacity_per_class = null,
