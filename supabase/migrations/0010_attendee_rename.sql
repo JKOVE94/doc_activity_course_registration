@@ -48,3 +48,6 @@ revoke execute on function public.record_attendee(text, text, text, text)
   from public, anon, authenticated;
 grant execute on function public.record_attendee(text, text, text, text)
   to service_role;
+
+-- PostgREST 스키마 캐시 갱신 (함수 시그니처 변경 반영)
+notify pgrst, 'reload schema';

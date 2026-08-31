@@ -106,3 +106,6 @@ revoke execute on function public.register_for_class(uuid, text, text) from publ
 revoke execute on function public.cancel_registration(text, text)      from public, anon, authenticated;
 grant  execute on function public.register_for_class(uuid, text, text) to service_role;
 grant  execute on function public.cancel_registration(text, text)      to service_role;
+
+-- PostgREST 스키마 캐시 갱신 (함수 시그니처 변경 반영)
+notify pgrst, 'reload schema';
