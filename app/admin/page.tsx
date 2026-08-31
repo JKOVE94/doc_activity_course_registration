@@ -59,6 +59,30 @@ function AdminInner() {
     };
   }, [authed, load]);
 
+  const login = async () => {
+    setWorking(true);
+    setAuthErr("");
+    try {
+      const res = await fetch("/api/admin/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw }),
+      });
+      const j = await res.json();
+      if (j.ok) {
+        setAuthed(true);
+      } else if (j.error === "SERVER") {
+        setAuthErr("서버 오류입니다. 환경변수(SUPABASE_SECRET_KEY) 설정을 확인하세요.");
+      } else {
+        setAuthErr("비밀번호가 올바르지 않습니다.");
+      }
+    } catch {
+      setAuthErr("잠시 후 다시 시도해 주세요.");
+    } finally {
+      setWorking(false);
+    }
+  };
+
   const setSystemStatus = async (next: SystemStatus) => {
     setWorking(true);
     setAuthErr("");
@@ -70,11 +94,10 @@ function AdminInner() {
       });
       const j = await res.json();
       if (j.ok) {
-        setAuthed(true);
         setStatus(next);
         await load();
       } else {
-        setAuthErr("비밀번호가 올바르지 않습니다.");
+        setAuthErr("상태 변경에 실패했습니다. 비밀번호를 다시 확인하세요.");
       }
     } finally {
       setWorking(false);
@@ -130,14 +153,14 @@ function AdminInner() {
             inputMode="numeric"
             value={pw}
             onChange={(e) => setPw(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && setSystemStatus(status)}
+            onKeyDown={(e) => e.key === "Enter" && login()}
             placeholder="관리자 비밀번호"
             className="mt-3 w-full h-11 rounded-xl border border-slate-300 px-3"
           />
           {authErr && <p className="text-sm text-red-500 mt-2">{authErr}</p>}
           <button
             disabled={working}
-            onClick={() => setSystemStatus(status)}
+            onClick={login}
             className="mt-3 w-full h-11 rounded-xl bg-slate-800 text-white font-semibold disabled:opacity-50"
           >
             로그인
