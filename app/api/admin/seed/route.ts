@@ -6,15 +6,20 @@ export const dynamic = "force-dynamic";
 
 // 테스트용 mock 데이터 생성 (부스 6개 + 가짜 로그인 인원 + 랜덤 신청). 기존 데이터는 초기화됨.
 export async function POST(req: Request) {
-  let body: { password?: string };
+  let body: { password?: string; scenario?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ ok: false, error: "INVALID_INPUT" }, { status: 400 });
   }
 
+  const scenario =
+    body.scenario === "classes" || body.scenario === "lastseat"
+      ? body.scenario
+      : "full";
   const { data, error } = await supabaseAdmin.rpc("admin_seed_demo", {
     p_password: body.password ?? "",
+    p_scenario: scenario,
   });
 
   if (error) {
