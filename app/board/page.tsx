@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { STATUS_LABEL, type SystemStatus } from "@/lib/constants";
 import type { ClassRow, RegistrationRow } from "@/lib/types";
@@ -14,41 +14,49 @@ export default function BoardPage() {
   const [attendees, setAttendees] = useState(0);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
-    const [snap, { data: r }] = await Promise.all([
-      supabase.rpc("get_public_snapshot"),
+    const [snapRes, { data: r }] = await Promise.all([
+      fetch("/api/snapshot", { cache: "no-store" }).then((x) => x.json()).catch(() => null),
       supabase
         .from("registrations")
         .select("seq, class_id, ranch_name, user_name, created_at")
         .order("seq"),
     ]);
-    const s = snap.data;
-    if (!snap.error && s) {
-      setClasses((s.classes as ClassRow[]) ?? []);
-      setStatus((s.status as SystemStatus) ?? "CLOSED");
-      setCapacity((s.capacity_per_class as number | null) ?? null);
-      setAttendees((s.attendees as number) ?? 0);
+    if (snapRes && !snapRes.error) {
+      setClasses((snapRes.classes as ClassRow[]) ?? []);
+      setStatus((snapRes.status as SystemStatus) ?? "CLOSED");
+      setCapacity((snapRes.capacity_per_class as number | null) ?? null);
+      setAttendees((snapRes.attendees as number) ?? 0);
     }
     setRegs((r as RegistrationRow[]) ?? []);
     setUpdatedAt(Date.now());
   }, []);
 
   useEffect(() => {
+    const scheduleReload = () => {
+      if (reloadTimer.current) return;
+      reloadTimer.current = setTimeout(() => {
+        reloadTimer.current = null;
+        load();
+      }, 1000);
+    };
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
     const channel = supabase
       .channel("board-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "registrations" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "classes" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "registrations" }, scheduleReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "classes" }, scheduleReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, scheduleReload)
       .subscribe();
-    const poll = setInterval(load, 4000);
+    const poll = setInterval(load, 5000);
     const tick = setInterval(() => setNow(Date.now()), 1000);
     return () => {
       supabase.removeChannel(channel);
       clearInterval(poll);
       clearInterval(tick);
+      if (reloadTimer.current) clearTimeout(reloadTimer.current);
     };
   }, [load]);
 

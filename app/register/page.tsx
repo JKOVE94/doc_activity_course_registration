@@ -2,15 +2,22 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Pencil } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/lib/useUser";
-import { REGISTER_ERROR_MESSAGE, STATUS_LABEL, type SystemStatus } from "@/lib/constants";
+import {
+  RANCHES,
+  REGISTER_ERROR_MESSAGE,
+  STATUS_LABEL,
+  isValidName,
+  type SystemStatus,
+} from "@/lib/constants";
 import type { ClassRow, ClassImageMeta } from "@/lib/types";
 import TabNav from "@/components/TabNav";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { user, ready, logout } = useUser();
+  const { user, ready, login } = useUser();
 
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [images, setImages] = useState<ClassImageMeta[]>([]);
@@ -19,7 +26,10 @@ export default function RegisterPage() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
   const [loaded, setLoaded] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (ready && !user) router.replace("/");
@@ -31,47 +41,89 @@ export default function RegisterPage() {
     toastTimer.current = setTimeout(() => setToast(""), 2400);
   }, []);
 
-  const load = useCallback(async () => {
-    if (!user) return;
-    const { data, error } = await supabase.rpc("get_public_snapshot", {
-      p_ranch: user.ranchName,
-      p_name: user.userName,
-    });
-    if (!error && data) {
-      setClasses((data.classes as ClassRow[]) ?? []);
-      setStatus((data.status as SystemStatus) ?? "CLOSED");
-      setMyClassId((data.my_class_id as string | null) ?? null);
-      setImages((data.images as ClassImageMeta[]) ?? []);
+  // 전역 스냅샷 (CDN 2초 캐시) — 접속자 수와 무관하게 DB 부하 일정
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch("/api/snapshot", { cache: "no-store" });
+      const data = await res.json();
+      if (res.ok && data) {
+        setClasses((data.classes as ClassRow[]) ?? []);
+        setStatus((data.status as SystemStatus) ?? "CLOSED");
+        setImages((data.images as ClassImageMeta[]) ?? []);
+      }
+    } catch {
+      /* keep last known */
+    } finally {
+      setLoaded(true);
     }
-    setLoaded(true);
+  }, []);
+
+  // 내 신청 상태 (본인 액션으로만 바뀌므로 마운트 시 1회만 조회)
+  const loadMine = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("registrations")
+      .select("class_id")
+      .eq("ranch_name", user.ranchName)
+      .eq("user_name", user.userName)
+      .maybeSingle();
+    setMyClassId((data?.class_id as string | null) ?? null);
   }, [user]);
 
+  // Realtime 이벤트 폭주 시 재조회를 1.2초로 합침
+  const scheduleRefresh = useCallback(() => {
+    if (reloadTimer.current) return;
+    reloadTimer.current = setTimeout(() => {
+      reloadTimer.current = null;
+      refresh();
+    }, 1200);
+  }, [refresh]);
+
+  // 로그인 인원 기록 (세션당 1회로 제한)
   useEffect(() => {
     if (!user) return;
-    // 로그인 인원 재기록 (로그인 시 기록이 실패했을 수 있음). 멱등.
+    const key = `yf_rec_${user.ranchName}_${user.userName}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+    } catch {
+      /* ignore */
+    }
     fetch("/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ranchName: user.ranchName, userName: user.userName }),
-    }).catch(() => {});
+    })
+      .then(() => {
+        try {
+          sessionStorage.setItem(key, "1");
+        } catch {
+          /* ignore */
+        }
+      })
+      .catch(() => {});
   }, [user]);
 
   useEffect(() => {
     if (!user) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
+    refresh();
+    loadMine();
     const channel = supabase
       .channel("registration-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "classes" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "classes" }, scheduleRefresh)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "app_settings" },
+        scheduleRefresh,
+      )
       .subscribe();
-    // Realtime 미설정/연결 실패 대비 폴백 폴링
-    const poll = setInterval(load, 5000);
+    const poll = setInterval(refresh, 4000);
     return () => {
       supabase.removeChannel(channel);
       clearInterval(poll);
+      if (reloadTimer.current) clearTimeout(reloadTimer.current);
     };
-  }, [user, load]);
+  }, [user, refresh, loadMine, scheduleRefresh]);
 
   const act = useCallback(
     async (path: "register" | "cancel", classId?: string) => {
@@ -86,17 +138,20 @@ export default function RegisterPage() {
         const j = await res.json();
         if (!j.ok) {
           flash(REGISTER_ERROR_MESSAGE[j.error as string] ?? REGISTER_ERROR_MESSAGE.SERVER);
+          // FULL/ALREADY 등 → 서버 기준으로 내 상태·현황 재동기화
+          await Promise.all([refresh(), loadMine()]);
         } else {
+          setMyClassId(path === "register" ? (classId ?? null) : null);
           flash(path === "register" ? "신청이 완료되었습니다!" : "신청이 취소되었습니다.");
+          await refresh();
         }
       } catch {
         flash(REGISTER_ERROR_MESSAGE.SERVER);
       } finally {
-        await load();
         setBusy(false);
       }
     },
-    [user, busy, flash, load],
+    [user, busy, flash, refresh, loadMine],
   );
 
   if (!ready || !user) return null;
@@ -106,30 +161,27 @@ export default function RegisterPage() {
       <TabNav />
 
       <header className="sticky top-[45px] z-10 bg-white/95 backdrop-blur border-b px-4 py-2.5 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-slate-800">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm font-semibold text-slate-800 truncate">
             {user.ranchName} · {user.userName}
           </span>
           <StatusPill status={status} />
         </div>
-        <button
-          onClick={() => {
-            logout();
-            router.replace("/");
-          }}
-          className="text-xs text-slate-400"
-        >
-          로그아웃
-        </button>
+        {status === "CLOSED" && (
+          <button
+            onClick={() => setEditOpen(true)}
+            className="shrink-0 flex items-center gap-1 text-xs text-slate-400"
+          >
+            <Pencil size={12} /> 이름 변경
+          </button>
+        )}
       </header>
 
       <div className="mx-auto max-w-md px-4 py-5 space-y-3">
         {status === "CLOSED" && (
           <Banner tone="info" text="⏳ 신청 준비 중입니다. 관리자가 신청을 열면 자동으로 반영됩니다." />
         )}
-        {status === "FINISHED" && (
-          <Banner tone="muted" text="✅ 수강신청이 종료되었습니다." />
-        )}
+        {status === "FINISHED" && <Banner tone="muted" text="✅ 수강신청이 종료되었습니다." />}
         {status === "OPEN" && !myClassId && (
           <Banner tone="info" text="한 명당 1개 부스만 신청할 수 있어요. 바꾸려면 취소 후 다시 신청하세요." />
         )}
@@ -140,8 +192,7 @@ export default function RegisterPage() {
           const full = c.current_count >= c.max_capacity;
           const mine = myClassId === c.id;
           const blockedByOther = !mine && !!myClassId;
-          const disabled =
-            busy || status !== "OPEN" || (!mine && (full || blockedByOther));
+          const disabled = busy || status !== "OPEN" || (!mine && (full || blockedByOther));
           const pct = Math.min(
             100,
             Math.round((c.current_count / Math.max(c.max_capacity, 1)) * 100),
@@ -178,9 +229,7 @@ export default function RegisterPage() {
                   </div>
                 </div>
                 <span
-                  className={`shrink-0 text-sm font-bold ${
-                    full ? "text-red-500" : "text-slate-700"
-                  }`}
+                  className={`shrink-0 text-sm font-bold ${full ? "text-red-500" : "text-slate-700"}`}
                 >
                   {c.current_count} / {c.max_capacity}명
                 </span>
@@ -221,6 +270,19 @@ export default function RegisterPage() {
         })}
       </div>
 
+      {editOpen && (
+        <EditIdentityModal
+          current={user}
+          onClose={() => setEditOpen(false)}
+          onSaved={(u) => {
+            login(u);
+            setEditOpen(false);
+            flash("정보가 변경되었습니다.");
+            loadMine();
+          }}
+        />
+      )}
+
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 rounded-full bg-slate-900 text-white text-sm px-4 py-2 shadow-lg">
           {toast}
@@ -230,11 +292,112 @@ export default function RegisterPage() {
   );
 }
 
+function EditIdentityModal({
+  current,
+  onClose,
+  onSaved,
+}: {
+  current: { ranchName: string; userName: string };
+  onClose: () => void;
+  onSaved: (u: { ranchName: string; userName: string }) => void;
+}) {
+  const [ranch, setRanch] = useState(current.ranchName);
+  const [name, setName] = useState(current.userName);
+  const [err, setErr] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!ranch) return setErr("목장을 선택해 주세요.");
+    if (!isValidName(name)) return setErr("이름은 한글 2글자 이상으로 입력해 주세요.");
+    setSaving(true);
+    setErr("");
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ranchName: ranch,
+          userName: name.trim(),
+          prevRanchName: current.ranchName,
+          prevUserName: current.userName,
+        }),
+      });
+      const j = await res.json();
+      if (j.ok) {
+        try {
+          sessionStorage.setItem(`yf_rec_${ranch}_${name.trim()}`, "1");
+        } catch {
+          /* ignore */
+        }
+        onSaved({ ranchName: ranch, userName: name.trim() });
+      } else {
+        setErr(
+          j.error === "INVALID_NAME"
+            ? "이름은 한글 2글자 이상으로 입력해 주세요."
+            : "변경에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        );
+      }
+    } catch {
+      setErr("변경에 실패했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center px-5">
+      <div className="w-full max-w-xs rounded-2xl bg-white p-5">
+        <h2 className="font-bold text-slate-800">목장 · 이름 변경</h2>
+        <p className="text-xs text-slate-400 mt-0.5">신청 오픈 전에만 변경할 수 있어요.</p>
+
+        <label className="block text-xs font-medium text-slate-600 mt-3 mb-1">목장</label>
+        <select
+          value={ranch}
+          onChange={(e) => {
+            setRanch(e.target.value);
+            setErr("");
+          }}
+          className="w-full h-11 rounded-xl border border-slate-300 bg-white px-3 text-base"
+        >
+          {RANCHES.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+
+        <label className="block text-xs font-medium text-slate-600 mt-3 mb-1">이름</label>
+        <input
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value.replace(/[^가-힣ㄱ-ㅎㅏ-ㅣ]/g, ""));
+            setErr("");
+          }}
+          maxLength={10}
+          className="w-full h-11 rounded-xl border border-slate-300 px-3 text-base"
+        />
+
+        {err && <p className="text-sm text-red-500 mt-2">{err}</p>}
+
+        <div className="mt-4 flex gap-2">
+          <button onClick={onClose} className="flex-1 h-10 rounded-xl bg-slate-100 font-semibold">
+            취소
+          </button>
+          <button
+            onClick={save}
+            disabled={saving}
+            className="flex-1 h-10 rounded-xl bg-blue-600 text-white font-semibold disabled:opacity-50"
+          >
+            {saving ? "저장 중…" : "저장"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Banner({ text, tone }: { text: string; tone: "info" | "muted" }) {
-  const cls =
-    tone === "info"
-      ? "bg-blue-50 text-blue-700"
-      : "bg-slate-100 text-slate-500";
+  const cls = tone === "info" ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-500";
   return <div className={`rounded-xl ${cls} text-sm text-center py-3 px-3`}>{text}</div>;
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Download, RotateCcw, FlaskConical, LogOut } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
@@ -41,15 +41,14 @@ function AdminInner() {
   const [working, setWorking] = useState(false);
 
   const load = useCallback(async () => {
-    const [snap, { data: r }] = await Promise.all([
-      supabase.rpc("get_public_snapshot"),
+    const [s, { data: r }] = await Promise.all([
+      fetch("/api/snapshot", { cache: "no-store" }).then((x) => x.json()).catch(() => null),
       supabase
         .from("registrations")
         .select("seq, class_id, ranch_name, user_name, created_at")
         .order("seq"),
     ]);
-    const s = snap.data;
-    if (!snap.error && s) {
+    if (s && !s.error) {
       setClasses((s.classes as ClassRow[]) ?? []);
       setStatus((s.status as SystemStatus) ?? "CLOSED");
       setCapacityPerClass((s.capacity_per_class as number | null) ?? null);
@@ -70,21 +69,31 @@ function AdminInner() {
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (!authed) return;
+    const scheduleReload = () => {
+      if (reloadTimer.current) return;
+      reloadTimer.current = setTimeout(() => {
+        reloadTimer.current = null;
+        load();
+      }, 1000);
+    };
     touchAdminSession();
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
     const channel = supabase
       .channel("admin-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "registrations" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "classes" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "registrations" }, scheduleReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "classes" }, scheduleReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, scheduleReload)
       .subscribe();
     const poll = setInterval(load, 5000);
     return () => {
       supabase.removeChannel(channel);
       clearInterval(poll);
+      if (reloadTimer.current) clearTimeout(reloadTimer.current);
     };
   }, [authed, load]);
 
