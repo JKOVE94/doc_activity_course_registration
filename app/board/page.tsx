@@ -16,24 +16,21 @@ export default function BoardPage() {
   const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback(async () => {
-    const [{ data: c }, { data: r }, { data: s }, { data: a }] = await Promise.all([
-      supabase.from("classes").select("*").order("sort_order"),
+    const [snap, { data: r }] = await Promise.all([
+      supabase.rpc("get_public_snapshot"),
       supabase
         .from("registrations")
         .select("seq, class_id, ranch_name, user_name, created_at")
         .order("seq"),
-      supabase
-        .from("app_settings")
-        .select("status, capacity_per_class")
-        .eq("id", 1)
-        .single(),
-      supabase.from("attendee_stats").select("total").single(),
     ]);
-    setClasses((c as ClassRow[]) ?? []);
+    const s = snap.data;
+    if (!snap.error && s) {
+      setClasses((s.classes as ClassRow[]) ?? []);
+      setStatus((s.status as SystemStatus) ?? "CLOSED");
+      setCapacity((s.capacity_per_class as number | null) ?? null);
+      setAttendees((s.attendees as number) ?? 0);
+    }
     setRegs((r as RegistrationRow[]) ?? []);
-    setStatus((s?.status as SystemStatus) ?? "CLOSED");
-    setCapacity((s?.capacity_per_class as number | null) ?? null);
-    setAttendees((a?.total as number) ?? 0);
     setUpdatedAt(Date.now());
   }, []);
 

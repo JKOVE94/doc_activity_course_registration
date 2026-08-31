@@ -34,30 +34,22 @@ function AdminInner() {
   const [working, setWorking] = useState(false);
 
   const load = useCallback(async () => {
-    const [{ data: c }, { data: r }, { data: s }, { data: im }, { data: att }] =
-      await Promise.all([
-        supabase.from("classes").select("*").order("sort_order"),
-        supabase
-          .from("registrations")
-          .select("seq, class_id, ranch_name, user_name, created_at")
-          .order("seq"),
-        supabase
-          .from("app_settings")
-          .select("status, capacity_per_class")
-          .eq("id", 1)
-          .single(),
-        supabase
-          .from("class_image_meta")
-          .select("id, class_id, sort, content_type, byte_size")
-          .order("sort"),
-        supabase.from("attendee_stats").select("total").single(),
-      ]);
-    setClasses((c as ClassRow[]) ?? []);
+    const [snap, { data: r }] = await Promise.all([
+      supabase.rpc("get_public_snapshot"),
+      supabase
+        .from("registrations")
+        .select("seq, class_id, ranch_name, user_name, created_at")
+        .order("seq"),
+    ]);
+    const s = snap.data;
+    if (!snap.error && s) {
+      setClasses((s.classes as ClassRow[]) ?? []);
+      setStatus((s.status as SystemStatus) ?? "CLOSED");
+      setCapacityPerClass((s.capacity_per_class as number | null) ?? null);
+      setImages((s.images as ClassImageMeta[]) ?? []);
+      setAttendeeTotal((s.attendees as number) ?? 0);
+    }
     setRegs((r as RegistrationRow[]) ?? []);
-    setStatus((s?.status as SystemStatus) ?? "CLOSED");
-    setCapacityPerClass((s?.capacity_per_class as number | null) ?? null);
-    setImages((im as ClassImageMeta[]) ?? []);
-    setAttendeeTotal((att?.total as number) ?? 0);
   }, []);
 
   useEffect(() => {

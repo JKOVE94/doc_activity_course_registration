@@ -28,7 +28,10 @@ export async function GET(
     headers: {
       "Content-Type": (row.content_type as string) || "image/jpeg",
       "Content-Length": String(bytes.length),
+      // 브라우저 + Vercel CDN 영구 캐시 (id 는 불변)
       "Cache-Control": "public, max-age=31536000, immutable",
+      "CDN-Cache-Control": "public, max-age=31536000, immutable",
+      "Vercel-CDN-Cache-Control": "public, max-age=31536000, immutable",
     },
   });
 }

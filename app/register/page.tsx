@@ -33,24 +33,16 @@ export default function RegisterPage() {
 
   const load = useCallback(async () => {
     if (!user) return;
-    const [{ data: cls }, { data: st }, { data: mine }, { data: im }] = await Promise.all([
-      supabase.from("classes").select("*").order("sort_order"),
-      supabase.from("app_settings").select("status").eq("id", 1).single(),
-      supabase
-        .from("registrations")
-        .select("class_id")
-        .eq("ranch_name", user.ranchName)
-        .eq("user_name", user.userName)
-        .maybeSingle(),
-      supabase
-        .from("class_image_meta")
-        .select("id, class_id, sort, content_type, byte_size")
-        .order("sort"),
-    ]);
-    if (cls) setClasses(cls as ClassRow[]);
-    if (st) setStatus((st.status as SystemStatus) ?? "CLOSED");
-    setMyClassId(mine?.class_id ?? null);
-    if (im) setImages(im as ClassImageMeta[]);
+    const { data, error } = await supabase.rpc("get_public_snapshot", {
+      p_ranch: user.ranchName,
+      p_name: user.userName,
+    });
+    if (!error && data) {
+      setClasses((data.classes as ClassRow[]) ?? []);
+      setStatus((data.status as SystemStatus) ?? "CLOSED");
+      setMyClassId((data.my_class_id as string | null) ?? null);
+      setImages((data.images as ClassImageMeta[]) ?? []);
+    }
     setLoaded(true);
   }, [user]);
 
