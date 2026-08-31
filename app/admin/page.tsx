@@ -141,11 +141,18 @@ function AdminInner() {
       if (j.ok) {
         setConfirmReset(false);
         await load();
+        alert(
+          `초기화 완료 — 신청 ${j.deleted_registrations ?? 0}건, 로그인 ${
+            j.deleted_attendees ?? 0
+          }명 삭제`,
+        );
       } else {
         alert(
           j.detail
             ? `초기화 실패: ${j.detail}${j.hint ? `\n힌트: ${j.hint}` : ""}`
-            : "초기화에 실패했습니다. 비밀번호를 확인하세요.",
+            : j.error === "BAD_PASSWORD"
+              ? "관리자 비밀번호가 올바르지 않습니다."
+              : "초기화에 실패했습니다.",
         );
       }
     } finally {
