@@ -45,7 +45,7 @@ Vercel 에서 이 두 변수는 "Config"(비민감)로, `SUPABASE_SECRET_KEY` �
 2. **SQL Editor** → 마이그레이션을 순서대로 실행:
    - `supabase/migrations/0001_init.sql`
    - `supabase/migrations/0002_harden_rpc.sql` (0001 을 이미 예전 버전으로 돌린 경우만)
-   - `supabase/migrations/0003_class_management.sql` (부스 GUI 관리 + 이미지 업로드)
+   - `supabase/migrations/0003_class_management.sql` (부스 GUI 관리 + 사진 DB 저장)
 3. (선택) `supabase/seed.sql` 실행해 샘플 부스 6개 삽입 — 실제 부스는 관리자 페이지에서 추가
 4. 관리자 비밀번호 변경:
    ```sql

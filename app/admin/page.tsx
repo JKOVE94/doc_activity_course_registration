@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Download, RotateCcw } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { STATUS_LABEL, type SystemStatus } from "@/lib/constants";
-import type { ClassRow, RegistrationRow } from "@/lib/types";
+import type { ClassRow, RegistrationRow, ClassImageMeta } from "@/lib/types";
 import ClassManager from "@/components/admin/ClassManager";
 
 export default function AdminPage() {
@@ -24,23 +24,29 @@ function AdminInner() {
   const [authErr, setAuthErr] = useState("");
 
   const [classes, setClasses] = useState<ClassRow[]>([]);
+  const [images, setImages] = useState<ClassImageMeta[]>([]);
   const [regs, setRegs] = useState<RegistrationRow[]>([]);
   const [status, setStatus] = useState<SystemStatus>("CLOSED");
   const [confirmReset, setConfirmReset] = useState(false);
   const [working, setWorking] = useState(false);
 
   const load = useCallback(async () => {
-    const [{ data: c }, { data: r }, { data: s }] = await Promise.all([
+    const [{ data: c }, { data: r }, { data: s }, { data: im }] = await Promise.all([
       supabase.from("classes").select("*").order("sort_order"),
       supabase
         .from("registrations")
         .select("seq, class_id, ranch_name, user_name, created_at")
         .order("seq"),
       supabase.from("app_settings").select("status").eq("id", 1).single(),
+      supabase
+        .from("class_image_meta")
+        .select("id, class_id, sort, content_type, byte_size")
+        .order("sort"),
     ]);
     setClasses((c as ClassRow[]) ?? []);
     setRegs((r as RegistrationRow[]) ?? []);
     setStatus((s?.status as SystemStatus) ?? "CLOSED");
+    setImages((im as ClassImageMeta[]) ?? []);
   }, []);
 
   useEffect(() => {
@@ -208,7 +214,12 @@ function AdminInner() {
           </p>
         </section>
 
-        <ClassManager password={pw} classes={classes} onChanged={load} />
+        <ClassManager
+          password={pw}
+          classes={classes}
+          images={images}
+          onChanged={load}
+        />
 
         <section className="rounded-2xl bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between">

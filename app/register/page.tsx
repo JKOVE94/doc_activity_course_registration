@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/lib/useUser";
 import { REGISTER_ERROR_MESSAGE, STATUS_LABEL, type SystemStatus } from "@/lib/constants";
-import type { ClassRow } from "@/lib/types";
+import type { ClassRow, ClassImageMeta } from "@/lib/types";
 import TabNav from "@/components/TabNav";
 
 export default function RegisterPage() {
@@ -13,6 +13,7 @@ export default function RegisterPage() {
   const { user, ready, logout } = useUser();
 
   const [classes, setClasses] = useState<ClassRow[]>([]);
+  const [images, setImages] = useState<ClassImageMeta[]>([]);
   const [status, setStatus] = useState<SystemStatus>("CLOSED");
   const [myClassId, setMyClassId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -32,7 +33,7 @@ export default function RegisterPage() {
 
   const load = useCallback(async () => {
     if (!user) return;
-    const [{ data: cls }, { data: st }, { data: mine }] = await Promise.all([
+    const [{ data: cls }, { data: st }, { data: mine }, { data: im }] = await Promise.all([
       supabase.from("classes").select("*").order("sort_order"),
       supabase.from("app_settings").select("status").eq("id", 1).single(),
       supabase
@@ -41,10 +42,15 @@ export default function RegisterPage() {
         .eq("ranch_name", user.ranchName)
         .eq("user_name", user.userName)
         .maybeSingle(),
+      supabase
+        .from("class_image_meta")
+        .select("id, class_id, sort, content_type, byte_size")
+        .order("sort"),
     ]);
     if (cls) setClasses(cls as ClassRow[]);
     if (st) setStatus((st.status as SystemStatus) ?? "CLOSED");
     setMyClassId(mine?.class_id ?? null);
+    if (im) setImages(im as ClassImageMeta[]);
     setLoaded(true);
   }, [user]);
 
@@ -148,15 +154,18 @@ export default function RegisterPage() {
             >
               <div className="flex justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  {c.image_urls?.[0] && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={c.image_urls[0]}
-                      alt=""
-                      loading="lazy"
-                      className="h-12 w-12 rounded-lg object-cover bg-slate-100 shrink-0"
-                    />
-                  )}
+                  {(() => {
+                    const first = images.find((i) => i.class_id === c.id);
+                    return first ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={`/api/images/${first.id}`}
+                        alt=""
+                        loading="lazy"
+                        className="h-12 w-12 rounded-lg object-cover bg-slate-100 shrink-0"
+                      />
+                    ) : null;
+                  })()}
                   <div className="min-w-0">
                     <h3 className="font-bold text-slate-800 truncate">{c.name}</h3>
                     <p className="text-xs text-slate-500 truncate">

@@ -3,24 +3,31 @@
 import { useEffect, useState } from "react";
 import { MapPin, User, Package, Users, UserPlus } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
-import type { ClassRow } from "@/lib/types";
+import type { ClassRow, ClassImageMeta } from "@/lib/types";
 import TabNav from "@/components/TabNav";
 import ImageStrip from "@/components/ImageStrip";
 
 export default function BoothsPage() {
   const [rows, setRows] = useState<ClassRow[]>([]);
+  const [images, setImages] = useState<ClassImageMeta[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase
-      .from("classes")
-      .select("*")
-      .order("sort_order")
-      .then(({ data }) => {
-        setRows((data as ClassRow[]) ?? []);
-        setLoading(false);
-      });
+    Promise.all([
+      supabase.from("classes").select("*").order("sort_order"),
+      supabase
+        .from("class_image_meta")
+        .select("id, class_id, sort, content_type, byte_size")
+        .order("sort"),
+    ]).then(([cls, im]) => {
+      setRows((cls.data as ClassRow[]) ?? []);
+      setImages((im.data as ClassImageMeta[]) ?? []);
+      setLoading(false);
+    });
   }, []);
+
+  const imageIds = (classId: string) =>
+    images.filter((i) => i.class_id === classId).map((i) => i.id);
 
   return (
     <main className="min-h-dvh bg-slate-50">
@@ -32,12 +39,14 @@ export default function BoothsPage() {
 
         {loading && <p className="text-center text-slate-400 py-10">불러오는 중…</p>}
 
-        {rows.map((c) => (
+        {rows.map((c) => {
+          const ids = imageIds(c.id);
+          return (
           <div key={c.id} className="rounded-2xl bg-white p-4 shadow-sm overflow-hidden">
             <h3 className="font-bold text-slate-800 text-lg">{c.name}</h3>
-            {c.image_urls?.length > 0 && (
+            {ids.length > 0 && (
               <div className="mt-3">
-                <ImageStrip urls={c.image_urls} />
+                <ImageStrip ids={ids} />
               </div>
             )}
             {c.description && (
@@ -69,7 +78,8 @@ export default function BoothsPage() {
               </p>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </main>
   );

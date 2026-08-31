@@ -8,7 +8,6 @@ export type ClassRow = {
   materials: string | null;
   max_capacity: number;
   current_count: number;
-  image_urls: string[];
   sort_order: number;
 };
 
@@ -20,7 +19,16 @@ export type RegistrationRow = {
   created_at: string;
 };
 
-// 부스 생성/수정 폼 페이로드 (admin_upsert_class 에 그대로 전달)
+// class_image_meta 뷰 (바이너리 data 제외)
+export type ClassImageMeta = {
+  id: string;
+  class_id: string;
+  sort: number;
+  content_type: string;
+  byte_size: number;
+};
+
+// 부스 생성/수정 폼 페이로드 (admin_upsert_class 에 전달). 사진은 별도 관리.
 export type ClassPayload = {
   id?: string;
   name: string;
@@ -30,6 +38,5 @@ export type ClassPayload = {
   location: string;
   materials: string;
   max_capacity: number;
-  image_urls: string[];
   sort_order?: number;
 };
