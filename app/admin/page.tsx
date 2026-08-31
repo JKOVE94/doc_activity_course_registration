@@ -1,8 +1,9 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Download, RotateCcw, FlaskConical, LogOut } from "lucide-react";
+import { Download, RotateCcw, FlaskConical, LogOut, ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { REGISTER_ERROR_MESSAGE, STATUS_LABEL, type SystemStatus } from "@/lib/constants";
 import type { ClassRow, RegistrationRow, ClassImageMeta } from "@/lib/types";
@@ -268,8 +269,14 @@ function AdminInner() {
 
   if (!authed) {
     return (
-      <main className="min-h-dvh flex items-center justify-center bg-slate-50 px-5">
+      <main className="min-h-dvh flex flex-col items-center justify-center bg-slate-50 px-5">
         <div className="w-full max-w-xs rounded-2xl bg-white p-6 shadow-sm">
+          <Link
+            href="/"
+            className="mb-3 inline-flex items-center gap-1 text-xs text-slate-400"
+          >
+            <ArrowLeft size={13} /> 홈으로
+          </Link>
           <h1 className="font-bold text-slate-800">관리자 로그인</h1>
           <p className="text-xs text-slate-400 mt-1">관리자 비밀번호를 입력하세요.</p>
           <input
@@ -305,9 +312,14 @@ function AdminInner() {
     <main className="min-h-dvh bg-slate-50 pb-16">
       <header className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b px-4 py-3">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="font-bold text-slate-800">관리자 대시보드</h1>
-            <p className="text-xs text-slate-500">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <Link href="/" className="text-slate-400 hover:text-slate-600" aria-label="홈으로">
+                <ArrowLeft size={16} />
+              </Link>
+              <h1 className="font-bold text-slate-800">관리자 대시보드</h1>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
               <span className="font-semibold">{STATUS_LABEL[status]}</span> · 로그인 {attendeeTotal}
               명 · 부스 {classes.length}개 · 분반당 정원 {capacityLabel} · 신청{" "}
               {totalRegistered}/{totalCapacity}

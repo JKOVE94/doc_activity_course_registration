@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { STATUS_LABEL, type SystemStatus } from "@/lib/constants";
 import type { ClassRow, RegistrationRow } from "@/lib/types";
@@ -68,9 +70,14 @@ export default function BoardPage() {
   return (
     <main className="min-h-dvh bg-slate-100">
       <header className="sticky top-0 z-10 bg-white border-b border-slate-200 px-6 py-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
-        <h1 className="text-xl font-bold text-slate-800">
-          연합목장활동 공통사모임 신청 현황
-        </h1>
+        <div className="flex items-center gap-2.5">
+          <Link href="/" className="text-slate-400 hover:text-slate-600" aria-label="홈으로">
+            <ArrowLeft size={18} />
+          </Link>
+          <h1 className="text-xl font-bold text-slate-800">
+            연합목장활동 공통사모임 신청 현황
+          </h1>
+        </div>
         <div className="flex items-center gap-5 text-sm text-slate-500">
           <StatusPill status={status} />
           <span>
