@@ -14,19 +14,14 @@ export default function BoothsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      supabase.from("classes").select("*").order("sort_order"),
-      supabase
-        .from("class_image_meta")
-        .select("id, class_id, sort, content_type, byte_size")
-        .order("sort"),
-      supabase.from("app_settings").select("status, capacity_per_class").eq("id", 1).single(),
-    ]).then(([cls, im, st]) => {
-      setRows((cls.data as ClassRow[]) ?? []);
-      setImages((im.data as ClassImageMeta[]) ?? []);
-      setCapacity(
-        st.data?.status === "OPEN" ? (st.data?.capacity_per_class as number | null) : null,
-      );
+    supabase.rpc("get_public_snapshot").then(({ data, error }) => {
+      if (!error && data) {
+        setRows((data.classes as ClassRow[]) ?? []);
+        setImages((data.images as ClassImageMeta[]) ?? []);
+        setCapacity(
+          data.status === "OPEN" ? (data.capacity_per_class as number | null) : null,
+        );
+      }
       setLoading(false);
     });
   }, []);
