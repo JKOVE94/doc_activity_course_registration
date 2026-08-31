@@ -56,7 +56,9 @@ Vercel 에서 이 두 변수는 "Config"(비민감)로, `SUPABASE_SECRET_KEY` �
    - `supabase/migrations/0004_dynamic_capacity.sql` (정원 자동 산정 + 로그인 인원 기록)
    - `supabase/migrations/0005_public_snapshot.sql` (공개 화면 통합 조회 함수 — 로딩 속도)
    - `supabase/migrations/0006_safe_where.sql` (pg_safeupdate 대응 — reset/오픈 함수 WHERE 보강)
-3. (선택) `supabase/seed.sql` 실행해 샘플 부스 6개 삽입 — 실제 부스는 관리자 페이지에서 추가
+   - `supabase/migrations/0007_reset_feedback.sql` (초기화 삭제 건수 반환)
+   - `supabase/migrations/0008_reset_scope_and_demo.sql` (초기화에 부스 포함 + 테스트 데이터 생성 함수)
+3. 실제 부스는 관리자 페이지 &lsquo;부스 관리&rsquo;에서 추가. 테스트는 관리자 &lsquo;테스트 데이터 생성&rsquo; 버튼으로 샘플 세팅.
 4. 관리자 비밀번호 변경:
    ```sql
    update public.admin_secret set password = '원하는비밀번호' where id = 1;
