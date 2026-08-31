@@ -114,8 +114,10 @@ function AdminInner() {
       } else {
         setConfirmOpen(false);
         setAuthErr(
-          REGISTER_ERROR_MESSAGE[j.error as string] ??
-            "상태 변경에 실패했습니다. 비밀번호를 다시 확인하세요.",
+          j.detail
+            ? `DB 오류: ${j.detail}`
+            : REGISTER_ERROR_MESSAGE[j.error as string] ??
+              "상태 변경에 실패했습니다. 비밀번호를 다시 확인하세요.",
         );
       }
     } finally {
@@ -140,7 +142,11 @@ function AdminInner() {
         setConfirmReset(false);
         await load();
       } else {
-        alert("초기화에 실패했습니다.");
+        alert(
+          j.detail
+            ? `초기화 실패: ${j.detail}${j.hint ? `\n힌트: ${j.hint}` : ""}`
+            : "초기화에 실패했습니다. 비밀번호를 확인하세요.",
+        );
       }
     } finally {
       setWorking(false);
