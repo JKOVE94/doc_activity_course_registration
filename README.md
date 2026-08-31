@@ -72,6 +72,11 @@ Vercel 에서 이 두 변수는 "Config"(비민감)로, `SUPABASE_SECRET_KEY` �
   - `supabase/migrations/0008_reset_scope_and_demo.sql` (초기화에 부스 포함 + 테스트 데이터 생성 함수)
   - `supabase/migrations/0009_register_perf.sql` (신청/취소 동시성 최적화)
   - `supabase/migrations/0010_attendee_rename.sql` (일반 유저 이름/목장 변경)
+  - `supabase/migrations/0011_seed_scenarios.sql` (테스트 데이터 시나리오 3종)
+  - `supabase/migrations/0012_reload_schema.sql` (PostgREST 스키마 캐시 갱신)
+
+   > 함수를 바꾼 뒤 `Could not find the function ... in the schema cache` 오류가 나면
+   > `notify pgrst, 'reload schema';` 를 SQL Editor 에서 실행하세요 (0012).
 3. 실제 부스는 관리자 페이지 &amp;lsquo;부스 관리&amp;rsquo;에서 추가. 테스트는 관리자 &amp;lsquo;테스트 데이터 생성&amp;rsquo; 버튼으로 샘플 세팅.
 4. 관리자 비밀번호 변경:
   ```sql
