@@ -137,7 +137,14 @@ function AdminInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: pw }),
       });
-      const j = await res.json();
+      const text = await res.text();
+      let j: Record<string, unknown>;
+      try {
+        j = JSON.parse(text);
+      } catch {
+        alert(`초기화 실패 (HTTP ${res.status})\n${text.slice(0, 300)}`);
+        return;
+      }
       if (j.ok) {
         setConfirmReset(false);
         await load();
@@ -152,9 +159,11 @@ function AdminInner() {
             ? `초기화 실패: ${j.detail}${j.hint ? `\n힌트: ${j.hint}` : ""}`
             : j.error === "BAD_PASSWORD"
               ? "관리자 비밀번호가 올바르지 않습니다."
-              : "초기화에 실패했습니다.",
+              : `초기화에 실패했습니다. (${j.error ?? "?"})`,
         );
       }
+    } catch (e) {
+      alert(`초기화 요청 실패: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setWorking(false);
     }
