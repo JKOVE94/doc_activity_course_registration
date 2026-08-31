@@ -26,11 +26,24 @@
 모든 쓰기는 서버 API Route(secret key)를 거쳐 DB 함수로만 실행되며,
 클라이언트는 테이블을 읽고 Realtime 구독만 합니다 (RLS 로 직접 쓰기 차단).
 
+### 브라우저에 노출되는 값
+
+`NEXT_PUBLIC_SUPABASE_URL` 과 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` 는 브라우저로 내려가지만
+**의도된 것이며 안전**합니다 (Supabase publishable 키는 공개 공유 가능하도록 설계됨):
+
+- `anon` 역할 권한만 가지며 상승 권한 없음
+- 테이블 접근은 RLS 로 제한 — `classes`/`registrations`/`app_settings` 는 **SELECT 만**, 쓰기 정책 없음
+- 신청/취소/관리 DB 함수는 `service_role`(secret key) 에게만 `execute` 부여 → publishable 키로 직접 호출 불가
+- `admin_secret` 테이블은 모든 역할 접근 차단
+
+Vercel 에서 이 두 변수는 "Config"(비민감)로, `SUPABASE_SECRET_KEY` 는 "Sensitive"로 등록하세요.
+
 ## 로컬 실행
 
 ### 1. Supabase 프로젝트 생성
 1. <https://supabase.com/dashboard> 에서 새 프로젝트 생성
 2. **SQL Editor** → `supabase/migrations/0001_init.sql` 전체 실행
+   (0001 을 이미 예전 버전으로 돌렸다면 `0002_harden_rpc.sql` 추가 실행)
 3. (선택) `supabase/seed.sql` 실행해 샘플 부스 6개 삽입
 4. 관리자 비밀번호 변경:
    ```sql

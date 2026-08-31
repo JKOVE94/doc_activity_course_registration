@@ -224,11 +224,18 @@ end;
 $$;
 
 -- ---------- 실행 권한 ----------------------------------------------------
--- 신청/취소는 서버(service_role)에서 호출하지만 anon 도 호출 가능하도록 열어둔다
--- (판정 로직이 함수 내부에 있으므로 안전). 관리자 함수는 service_role 만.
+-- 모든 쓰기 함수는 서버 API Route(secret key = service_role) 에서만 호출한다.
+-- publishable(anon) 키로는 함수를 직접 호출할 수 없게 막아, 브라우저에 노출되는
+-- 키가 사실상 "읽기 전용"이 되도록 한다.
 
-grant execute on function public.register_for_class(uuid, text, text) to anon, authenticated, service_role;
-grant execute on function public.cancel_registration(text, text)      to anon, authenticated, service_role;
+revoke execute on function public.register_for_class(uuid, text, text) from public, anon, authenticated;
+revoke execute on function public.cancel_registration(text, text)      from public, anon, authenticated;
+revoke execute on function public.admin_verify(text)                   from public, anon, authenticated;
+revoke execute on function public.admin_set_status(text, text)         from public, anon, authenticated;
+revoke execute on function public.admin_reset(text)                    from public, anon, authenticated;
+
+grant execute on function public.register_for_class(uuid, text, text) to service_role;
+grant execute on function public.cancel_registration(text, text)      to service_role;
 grant execute on function public.admin_verify(text)                   to service_role;
 grant execute on function public.admin_set_status(text, text)         to service_role;
 grant execute on function public.admin_reset(text)                    to service_role;
