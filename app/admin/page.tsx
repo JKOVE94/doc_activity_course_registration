@@ -44,7 +44,7 @@ function AdminInner() {
   const [working, setWorking] = useState(false);
 
   const load = useCallback(async () => {
-    const [s, { data: r }] = await Promise.all([
+    const [s, regRes] = await Promise.all([
       fetch("/api/snapshot", { cache: "no-store" }).then((x) => x.json()).catch(() => null),
       supabase
         .from("registrations")
@@ -58,7 +58,10 @@ function AdminInner() {
       setImages((s.images as ClassImageMeta[]) ?? []);
       setAttendeeTotal((s.attendees as number) ?? 0);
     }
-    setRegs((r as RegistrationRow[]) ?? []);
+    // 조회 실패 시 기존 명단 유지
+    if (!regRes.error && Array.isArray(regRes.data)) {
+      setRegs(regRes.data as RegistrationRow[]);
+    }
     touchAdminSession(); // 활동 중 세션 만료 연장
   }, []);
 
@@ -497,8 +500,13 @@ function AdminInner() {
             <p className="font-bold text-slate-800">지금 신청을 오픈할까요?</p>
             <p className="text-sm text-slate-500 mt-1">
               현재 로그인 <b>{attendeeTotal}명</b> ÷ 부스 <b>{classes.length}개</b> ={" "}
-              <b>분반당 {previewCapacity}명</b>으로 모든 부스 정원이 고정됩니다.
+              <b>분반당 {previewCapacity}명</b>으로 정원이 고정됩니다.
             </p>
+            {classes.some((c) => c.capacity_cap != null) && (
+              <p className="text-xs text-slate-400 mt-1">
+                상한이 설정된 부스는 상한 값(더 작은 쪽)이 적용됩니다.
+              </p>
+            )}
             {attendeeTotal === 0 && (
               <p className="text-sm text-red-500 mt-1">로그인한 인원이 없어 오픈할 수 없습니다.</p>
             )}

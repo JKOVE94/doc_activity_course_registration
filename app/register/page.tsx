@@ -61,12 +61,13 @@ export default function RegisterPage() {
   // 내 신청 상태 (본인 액션으로만 바뀌므로 마운트 시 1회만 조회)
   const loadMine = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("registrations")
       .select("class_id")
       .eq("ranch_name", user.ranchName)
       .eq("user_name", user.userName)
       .maybeSingle();
+    if (error) return; // 조회 실패 시 기존 상태 유지
     setMyClassId((data?.class_id as string | null) ?? null);
   }, [user]);
 
