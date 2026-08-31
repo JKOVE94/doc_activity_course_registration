@@ -69,7 +69,7 @@ export default function BoardPage() {
     <main className="min-h-dvh bg-slate-100">
       <header className="sticky top-0 z-10 bg-white border-b border-slate-200 px-6 py-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
         <h1 className="text-xl font-bold text-slate-800">
-          연합목장 공통사 수강신청 현황
+          연합목장활동 공통사모임 신청 현황
         </h1>
         <div className="flex items-center gap-5 text-sm text-slate-500">
           <StatusPill status={status} />
