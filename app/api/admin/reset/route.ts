@@ -18,8 +18,11 @@ export async function POST(req: Request) {
 
   if (error) {
     console.error("admin_reset error", error);
-    return NextResponse.json({ ok: false, error: "SERVER" }, { status: 500 });
+    // 관리자 전용 엔드포인트이므로 원인 메시지를 그대로 노출해 진단을 돕는다.
+    return NextResponse.json(
+      { ok: false, error: "SERVER", detail: error.message, hint: error.hint ?? null },
+      { status: 500 },
+    );
   }
-
   return NextResponse.json(data, { status: data?.ok ? 200 : 401 });
 }

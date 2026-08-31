@@ -40,7 +40,10 @@ export async function POST(req: Request) {
 
   if (error) {
     console.error("admin_add_class_image error", error);
-    return NextResponse.json({ ok: false, error: "SERVER" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "SERVER", detail: error.message, hint: error.hint ?? null },
+      { status: 500 },
+    );
   }
   return NextResponse.json(data, { status: data?.ok ? 200 : 400 });
 }
@@ -61,7 +64,10 @@ export async function DELETE(req: Request) {
 
   if (error) {
     console.error("admin_delete_class_image error", error);
-    return NextResponse.json({ ok: false, error: "SERVER" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "SERVER", detail: error.message, hint: error.hint ?? null },
+      { status: 500 },
+    );
   }
   return NextResponse.json(data, { status: data?.ok ? 200 : 400 });
 }
