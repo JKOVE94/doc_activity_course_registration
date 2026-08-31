@@ -56,6 +56,16 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (!user) return;
+    // 로그인 인원 재기록 (로그인 시 기록이 실패했을 수 있음). 멱등.
+    fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ranchName: user.ranchName, userName: user.userName }),
+    }).catch(() => {});
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
     const channel = supabase

@@ -21,10 +21,24 @@ export default function LoginPage() {
     if (ready && user) router.replace("/register");
   }, [ready, user, router]);
 
-  const submit = () => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
     if (!ranch) return setErr("목장을 선택해 주세요.");
     if (!name.trim()) return setErr("이름을 입력해 주세요.");
-    login({ ranchName: ranch, userName: name.trim() });
+    const u = { ranchName: ranch, userName: name.trim() };
+    setSubmitting(true);
+    // 로그인 인원 기록 (정원 산정 기준). 실패해도 입장은 막지 않는다.
+    try {
+      await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(u),
+      });
+    } catch {
+      /* ignore */
+    }
+    login(u);
     router.push("/register");
   };
 
@@ -76,9 +90,10 @@ export default function LoginPage() {
 
           <button
             onClick={submit}
-            className="w-full h-12 rounded-xl bg-blue-600 text-white font-semibold active:scale-[.98] transition"
+            disabled={submitting}
+            className="w-full h-12 rounded-xl bg-blue-600 text-white font-semibold active:scale-[.98] transition disabled:opacity-60"
           >
-            입장하기
+            {submitting ? "입장 중…" : "입장하기"}
           </button>
         </div>
 

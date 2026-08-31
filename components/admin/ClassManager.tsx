@@ -16,7 +16,6 @@ const EMPTY: ClassPayload = {
   description: "",
   location: "",
   materials: "",
-  max_capacity: 10,
 };
 
 type Props = {
@@ -50,7 +49,6 @@ export default function ClassManager({ password, classes, images, onChanged }: P
       description: c.description ?? "",
       location: c.location ?? "",
       materials: c.materials ?? "",
-      max_capacity: c.max_capacity,
       sort_order: c.sort_order,
     });
   };
@@ -142,8 +140,7 @@ export default function ClassManager({ password, classes, images, onChanged }: P
                 <p className="text-sm font-semibold text-slate-800 truncate">{c.name}</p>
                 <p className="text-xs text-slate-500 truncate">
                   {c.instructor}
-                  {c.instructor_sub ? ` · ${c.instructor_sub}` : ""} · 정원 {c.max_capacity} ·
-                  사진 {imgCount(c.id)}
+                  {c.instructor_sub ? ` · ${c.instructor_sub}` : ""} · 사진 {imgCount(c.id)}
                 </p>
               </div>
               {deleteId === c.id ? (
@@ -365,26 +362,19 @@ function ClassFormModal({
                 placeholder="본당 2층"
               />
             </Field>
-            <Field label="정원">
+            <Field label="준비물">
               <input
-                type="number"
-                inputMode="numeric"
-                min={1}
-                value={form.max_capacity}
-                onChange={(e) => set("max_capacity", Number(e.target.value) || 1)}
+                value={form.materials}
+                onChange={(e) => set("materials", e.target.value)}
                 className={INPUT_CLS}
+                placeholder="없음"
               />
             </Field>
           </div>
 
-          <Field label="준비물">
-            <input
-              value={form.materials}
-              onChange={(e) => set("materials", e.target.value)}
-              className={INPUT_CLS}
-              placeholder="없음 (재료 제공)"
-            />
-          </Field>
+          <p className="text-xs text-slate-400">
+            정원은 신청 오픈 시 <b>로그인 인원 ÷ 부스 수</b>로 자동 계산돼 모든 부스에 동일하게 적용됩니다.
+          </p>
 
           <div>
             <p className="text-xs font-medium text-slate-600 mb-1.5">
