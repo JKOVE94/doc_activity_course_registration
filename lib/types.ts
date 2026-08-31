@@ -28,7 +28,7 @@ export type ClassImageMeta = {
   byte_size: number;
 };
 
-// 부스 생성/수정 폼 페이로드 (admin_upsert_class 에 전달). 사진은 별도 관리.
+// 부스 생성/수정 폼 페이로드 (admin_upsert_class 에 전달). 사진/정원은 별도.
 export type ClassPayload = {
   id?: string;
   name: string;
@@ -37,6 +37,11 @@ export type ClassPayload = {
   description: string;
   location: string;
   materials: string;
-  max_capacity: number;
   sort_order?: number;
+};
+
+export type AppSettings = {
+  status: "CLOSED" | "OPEN" | "FINISHED";
+  capacity_per_class: number | null; // OPEN 시 고정된 분반당 정원
+  attendee_count_at_open: number | null;
 };

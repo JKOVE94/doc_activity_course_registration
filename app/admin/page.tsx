@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Download, RotateCcw } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
-import { STATUS_LABEL, type SystemStatus } from "@/lib/constants";
+import { REGISTER_ERROR_MESSAGE, STATUS_LABEL, type SystemStatus } from "@/lib/constants";
 import type { ClassRow, RegistrationRow, ClassImageMeta } from "@/lib/types";
 import ClassManager from "@/components/admin/ClassManager";
 
@@ -27,26 +27,37 @@ function AdminInner() {
   const [images, setImages] = useState<ClassImageMeta[]>([]);
   const [regs, setRegs] = useState<RegistrationRow[]>([]);
   const [status, setStatus] = useState<SystemStatus>("CLOSED");
+  const [capacityPerClass, setCapacityPerClass] = useState<number | null>(null);
+  const [attendeeTotal, setAttendeeTotal] = useState(0);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [working, setWorking] = useState(false);
 
   const load = useCallback(async () => {
-    const [{ data: c }, { data: r }, { data: s }, { data: im }] = await Promise.all([
-      supabase.from("classes").select("*").order("sort_order"),
-      supabase
-        .from("registrations")
-        .select("seq, class_id, ranch_name, user_name, created_at")
-        .order("seq"),
-      supabase.from("app_settings").select("status").eq("id", 1).single(),
-      supabase
-        .from("class_image_meta")
-        .select("id, class_id, sort, content_type, byte_size")
-        .order("sort"),
-    ]);
+    const [{ data: c }, { data: r }, { data: s }, { data: im }, { data: att }] =
+      await Promise.all([
+        supabase.from("classes").select("*").order("sort_order"),
+        supabase
+          .from("registrations")
+          .select("seq, class_id, ranch_name, user_name, created_at")
+          .order("seq"),
+        supabase
+          .from("app_settings")
+          .select("status, capacity_per_class")
+          .eq("id", 1)
+          .single(),
+        supabase
+          .from("class_image_meta")
+          .select("id, class_id, sort, content_type, byte_size")
+          .order("sort"),
+        supabase.from("attendee_stats").select("total").single(),
+      ]);
     setClasses((c as ClassRow[]) ?? []);
     setRegs((r as RegistrationRow[]) ?? []);
     setStatus((s?.status as SystemStatus) ?? "CLOSED");
+    setCapacityPerClass((s?.capacity_per_class as number | null) ?? null);
     setImages((im as ClassImageMeta[]) ?? []);
+    setAttendeeTotal((att?.total as number) ?? 0);
   }, []);
 
   useEffect(() => {
@@ -91,6 +102,10 @@ function AdminInner() {
   };
 
   const setSystemStatus = async (next: SystemStatus) => {
+    if (next === "OPEN" && !confirmOpen) {
+      setConfirmOpen(true);
+      return;
+    }
     setWorking(true);
     setAuthErr("");
     try {
@@ -101,15 +116,24 @@ function AdminInner() {
       });
       const j = await res.json();
       if (j.ok) {
+        setConfirmOpen(false);
         setStatus(next);
         await load();
       } else {
-        setAuthErr("상태 변경에 실패했습니다. 비밀번호를 다시 확인하세요.");
+        setConfirmOpen(false);
+        setAuthErr(
+          REGISTER_ERROR_MESSAGE[j.error as string] ??
+            "상태 변경에 실패했습니다. 비밀번호를 다시 확인하세요.",
+        );
       }
     } finally {
       setWorking(false);
     }
   };
+
+  // 지금 오픈하면 적용될 분반당 정원 (미리보기)
+  const previewCapacity =
+    classes.length > 0 ? Math.max(Math.ceil(attendeeTotal / classes.length), 1) : 0;
 
   const doReset = async () => {
     setWorking(true);
@@ -179,14 +203,19 @@ function AdminInner() {
 
   const totalRegistered = regs.length;
   const totalCapacity = classes.reduce((s, c) => s + c.max_capacity, 0);
+  const capacityLabel =
+    status === "OPEN" && capacityPerClass != null
+      ? `${capacityPerClass}명`
+      : "오픈 시 확정";
 
   return (
     <main className="min-h-dvh bg-slate-50 pb-16">
       <header className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b px-4 py-3">
         <h1 className="font-bold text-slate-800">관리자 대시보드</h1>
         <p className="text-xs text-slate-500">
-          현재 상태 · <span className="font-semibold">{STATUS_LABEL[status]}</span> · 신청{" "}
-          {totalRegistered}/{totalCapacity}명
+          <span className="font-semibold">{STATUS_LABEL[status]}</span> · 로그인 {attendeeTotal}명 ·
+          부스 {classes.length}개 · 분반당 정원 {capacityLabel} · 신청{" "}
+          {totalRegistered}/{totalCapacity}
         </p>
       </header>
 
@@ -209,8 +238,11 @@ function AdminInner() {
               </button>
             ))}
           </div>
+          {authErr && <p className="mt-2 text-sm text-red-500">{authErr}</p>}
           <p className="mt-2 text-xs text-slate-400">
-            &lsquo;오픈&rsquo; 시에만 신청/취소가 가능합니다. &lsquo;종료&rsquo; 시 전체 기능이 중단됩니다.
+            &lsquo;오픈&rsquo;하는 순간 <b>로그인 인원({attendeeTotal}) ÷ 부스({classes.length})</b> ={" "}
+            <b>분반당 {previewCapacity}명</b>으로 정원이 고정됩니다. &lsquo;대기&rsquo;→&lsquo;오픈&rsquo;을
+            다시 하면 그 시점 인원으로 재계산됩니다.
           </p>
         </section>
 
@@ -301,6 +333,39 @@ function AdminInner() {
           </button>
         </section>
       </div>
+
+      {confirmOpen && (
+        <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center px-5">
+          <div className="w-full max-w-xs rounded-2xl bg-white p-5">
+            <p className="font-bold text-slate-800">지금 신청을 오픈할까요?</p>
+            <p className="text-sm text-slate-500 mt-1">
+              현재 로그인 <b>{attendeeTotal}명</b> ÷ 부스 <b>{classes.length}개</b> ={" "}
+              <b>분반당 {previewCapacity}명</b>으로 모든 부스 정원이 고정됩니다.
+            </p>
+            {attendeeTotal === 0 && (
+              <p className="text-sm text-red-500 mt-1">로그인한 인원이 없어 오픈할 수 없습니다.</p>
+            )}
+            {classes.length === 0 && (
+              <p className="text-sm text-red-500 mt-1">등록된 부스가 없습니다.</p>
+            )}
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => setConfirmOpen(false)}
+                className="flex-1 h-10 rounded-xl bg-slate-100 font-semibold"
+              >
+                취소
+              </button>
+              <button
+                disabled={working || attendeeTotal === 0 || classes.length === 0}
+                onClick={() => setSystemStatus("OPEN")}
+                className="flex-1 h-10 rounded-xl bg-blue-600 text-white font-semibold disabled:opacity-50"
+              >
+                오픈
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirmReset && (
         <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center px-5">

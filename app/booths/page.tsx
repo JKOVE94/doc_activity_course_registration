@@ -10,6 +10,7 @@ import ImageStrip from "@/components/ImageStrip";
 export default function BoothsPage() {
   const [rows, setRows] = useState<ClassRow[]>([]);
   const [images, setImages] = useState<ClassImageMeta[]>([]);
+  const [capacity, setCapacity] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,9 +20,13 @@ export default function BoothsPage() {
         .from("class_image_meta")
         .select("id, class_id, sort, content_type, byte_size")
         .order("sort"),
-    ]).then(([cls, im]) => {
+      supabase.from("app_settings").select("status, capacity_per_class").eq("id", 1).single(),
+    ]).then(([cls, im, st]) => {
       setRows((cls.data as ClassRow[]) ?? []);
       setImages((im.data as ClassImageMeta[]) ?? []);
+      setCapacity(
+        st.data?.status === "OPEN" ? (st.data?.capacity_per_class as number | null) : null,
+      );
       setLoading(false);
     });
   }, []);
@@ -74,7 +79,8 @@ export default function BoothsPage() {
                 </p>
               )}
               <p className="flex items-center gap-1.5 font-semibold text-slate-700 pt-0.5">
-                <Users size={13} /> 정원 {c.max_capacity}명
+                <Users size={13} />{" "}
+                {capacity != null ? `분반당 정원 ${capacity}명` : "정원 신청 오픈 시 확정"}
               </p>
             </div>
           </div>
