@@ -4,10 +4,16 @@ import { isValidName, isValidRanch } from "@/lib/constants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 10;
 
 // 로그인 인원 기록 (정원 자동 산정 기준). 중복은 무시된다.
 export async function POST(req: Request) {
-  let body: { ranchName?: string; userName?: string };
+  let body: {
+    ranchName?: string;
+    userName?: string;
+    prevRanchName?: string;
+    prevUserName?: string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -26,6 +32,8 @@ export async function POST(req: Request) {
   const { data, error } = await supabaseAdmin.rpc("record_attendee", {
     p_ranch: ranchName,
     p_name: userName,
+    p_prev_ranch: (body.prevRanchName ?? "").trim() || null,
+    p_prev_name: (body.prevUserName ?? "").trim() || null,
   });
 
   if (error) {

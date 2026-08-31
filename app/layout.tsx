@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "연합목장 공통사 수강신청",
+  title: "연합목장활동 공통사모임 수강신청",
   description: "청년부 연합목장모임 공통사 부스 선착순 수강신청",
 };
 

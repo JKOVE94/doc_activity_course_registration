@@ -1,12 +1,18 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Download, RotateCcw } from "lucide-react";
+import { Download, RotateCcw, FlaskConical, LogOut } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { REGISTER_ERROR_MESSAGE, STATUS_LABEL, type SystemStatus } from "@/lib/constants";
 import type { ClassRow, RegistrationRow, ClassImageMeta } from "@/lib/types";
 import ClassManager from "@/components/admin/ClassManager";
+import {
+  loadAdminSession,
+  saveAdminSession,
+  touchAdminSession,
+  clearAdminSession,
+} from "@/lib/adminSession";
 
 export default function AdminPage() {
   return (
@@ -30,19 +36,19 @@ function AdminInner() {
   const [capacityPerClass, setCapacityPerClass] = useState<number | null>(null);
   const [attendeeTotal, setAttendeeTotal] = useState(0);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmSeed, setConfirmSeed] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [working, setWorking] = useState(false);
 
   const load = useCallback(async () => {
-    const [snap, { data: r }] = await Promise.all([
-      supabase.rpc("get_public_snapshot"),
+    const [s, { data: r }] = await Promise.all([
+      fetch("/api/snapshot", { cache: "no-store" }).then((x) => x.json()).catch(() => null),
       supabase
         .from("registrations")
         .select("seq, class_id, ranch_name, user_name, created_at")
         .order("seq"),
     ]);
-    const s = snap.data;
-    if (!snap.error && s) {
+    if (s && !s.error) {
       setClasses((s.classes as ClassRow[]) ?? []);
       setStatus((s.status as SystemStatus) ?? "CLOSED");
       setCapacityPerClass((s.capacity_per_class as number | null) ?? null);
@@ -50,22 +56,44 @@ function AdminInner() {
       setAttendeeTotal((s.attendees as number) ?? 0);
     }
     setRegs((r as RegistrationRow[]) ?? []);
+    touchAdminSession(); // 활동 중 세션 만료 연장
   }, []);
+
+  // 새로고침 시 저장된 세션(30분) 복원
+  useEffect(() => {
+    const saved = loadAdminSession();
+    if (!saved) return;
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setPw(saved);
+    setAuthed(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!authed) return;
+    const scheduleReload = () => {
+      if (reloadTimer.current) return;
+      reloadTimer.current = setTimeout(() => {
+        reloadTimer.current = null;
+        load();
+      }, 1000);
+    };
+    touchAdminSession();
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
     const channel = supabase
       .channel("admin-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "registrations" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "classes" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "registrations" }, scheduleReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "classes" }, scheduleReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, scheduleReload)
       .subscribe();
     const poll = setInterval(load, 5000);
     return () => {
       supabase.removeChannel(channel);
       clearInterval(poll);
+      if (reloadTimer.current) clearTimeout(reloadTimer.current);
     };
   }, [authed, load]);
 
@@ -80,6 +108,7 @@ function AdminInner() {
       });
       const j = await res.json();
       if (j.ok) {
+        saveAdminSession(pw);
         setAuthed(true);
       } else if (j.error === "SERVER") {
         setAuthErr("서버 오류입니다. 환경변수(SUPABASE_SECRET_KEY) 설정을 확인하세요.");
@@ -108,6 +137,7 @@ function AdminInner() {
       });
       const j = await res.json();
       if (j.ok) {
+        touchAdminSession();
         setConfirmOpen(false);
         setStatus(next);
         await load();
@@ -137,14 +167,22 @@ function AdminInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: pw }),
       });
-      const j = await res.json();
+      const text = await res.text();
+      let j: Record<string, unknown>;
+      try {
+        j = JSON.parse(text);
+      } catch {
+        alert(`초기화 실패 (HTTP ${res.status})\n${text.slice(0, 300)}`);
+        return;
+      }
       if (j.ok) {
+        touchAdminSession();
         setConfirmReset(false);
         await load();
         alert(
           `초기화 완료 — 신청 ${j.deleted_registrations ?? 0}건, 로그인 ${
             j.deleted_attendees ?? 0
-          }명 삭제`,
+          }명, 부스 ${j.deleted_classes ?? 0}개 삭제`,
         );
       } else {
         alert(
@@ -152,12 +190,62 @@ function AdminInner() {
             ? `초기화 실패: ${j.detail}${j.hint ? `\n힌트: ${j.hint}` : ""}`
             : j.error === "BAD_PASSWORD"
               ? "관리자 비밀번호가 올바르지 않습니다."
-              : "초기화에 실패했습니다.",
+              : `초기화에 실패했습니다. (${j.error ?? "?"})`,
         );
       }
+    } catch (e) {
+      alert(`초기화 요청 실패: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setWorking(false);
     }
+  };
+
+  const doSeed = async () => {
+    setWorking(true);
+    try {
+      const res = await fetch("/api/admin/seed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw }),
+      });
+      const text = await res.text();
+      let j: Record<string, unknown>;
+      try {
+        j = JSON.parse(text);
+      } catch {
+        alert(`생성 실패 (HTTP ${res.status})\n${text.slice(0, 300)}`);
+        return;
+      }
+      if (j.ok) {
+        touchAdminSession();
+        setConfirmSeed(false);
+        await load();
+        alert(
+          `테스트 데이터 생성 완료 — 부스 ${j.classes ?? 0}개, 로그인 ${
+            j.attendees ?? 0
+          }명, 신청 ${j.registrations ?? 0}건`,
+        );
+      } else {
+        alert(
+          j.detail
+            ? `생성 실패: ${j.detail}`
+            : j.error === "BAD_PASSWORD"
+              ? "관리자 비밀번호가 올바르지 않습니다."
+              : `생성에 실패했습니다. (${j.error ?? "?"})`,
+        );
+      }
+    } catch (e) {
+      alert(`생성 요청 실패: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const logout = () => {
+    clearAdminSession();
+    setPw("");
+    setAuthed(false);
+    setAuthErr("");
   };
 
   const download = async () => {
@@ -216,12 +304,22 @@ function AdminInner() {
   return (
     <main className="min-h-dvh bg-slate-50 pb-16">
       <header className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b px-4 py-3">
-        <h1 className="font-bold text-slate-800">관리자 대시보드</h1>
-        <p className="text-xs text-slate-500">
-          <span className="font-semibold">{STATUS_LABEL[status]}</span> · 로그인 {attendeeTotal}명 ·
-          부스 {classes.length}개 · 분반당 정원 {capacityLabel} · 신청{" "}
-          {totalRegistered}/{totalCapacity}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="font-bold text-slate-800">관리자 대시보드</h1>
+            <p className="text-xs text-slate-500">
+              <span className="font-semibold">{STATUS_LABEL[status]}</span> · 로그인 {attendeeTotal}
+              명 · 부스 {classes.length}개 · 분반당 정원 {capacityLabel} · 신청{" "}
+              {totalRegistered}/{totalCapacity}
+            </p>
+          </div>
+          <button
+            onClick={logout}
+            className="shrink-0 flex items-center gap-1 text-xs text-slate-400 border border-slate-200 rounded-lg px-2 py-1"
+          >
+            <LogOut size={13} /> 로그아웃
+          </button>
+        </div>
       </header>
 
       <div className="mx-auto max-w-2xl px-4 py-5 space-y-5">
@@ -325,16 +423,29 @@ function AdminInner() {
           </div>
         </section>
 
+        <section className="rounded-2xl bg-amber-50 border border-amber-100 p-4">
+          <h2 className="font-bold text-amber-700">테스트 도구</h2>
+          <p className="text-xs text-amber-600/80 mt-0.5">
+            기존 데이터를 모두 지우고 샘플 부스 6개 + 가짜 로그인 인원 + 랜덤 신청을 생성합니다.
+          </p>
+          <button
+            onClick={() => setConfirmSeed(true)}
+            className="mt-3 flex items-center justify-center gap-1.5 h-11 w-full rounded-xl bg-amber-500 text-white font-semibold"
+          >
+            <FlaskConical size={15} /> 테스트 데이터 생성
+          </button>
+        </section>
+
         <section className="rounded-2xl bg-red-50 border border-red-100 p-4">
           <h2 className="font-bold text-red-700">위험 구역</h2>
           <p className="text-xs text-red-500/80 mt-0.5">
-            모든 청년의 신청 내역이 삭제되고 상태가 &lsquo;대기&rsquo;로 초기화됩니다.
+            모든 부스·신청·로그인 인원이 삭제되고 상태가 &lsquo;대기&rsquo;로 초기화됩니다.
           </p>
           <button
             onClick={() => setConfirmReset(true)}
             className="mt-3 flex items-center justify-center gap-1.5 h-11 w-full rounded-xl bg-red-600 text-white font-semibold"
           >
-            <RotateCcw size={15} /> 전체 신청 내역 초기화
+            <RotateCcw size={15} /> 전체 초기화 (부스 포함)
           </button>
         </section>
       </div>
@@ -392,6 +503,32 @@ function AdminInner() {
                 className="flex-1 h-10 rounded-xl bg-red-600 text-white font-semibold disabled:opacity-50"
               >
                 초기화
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmSeed && (
+        <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center px-5">
+          <div className="w-full max-w-xs rounded-2xl bg-white p-5">
+            <p className="font-bold text-slate-800">테스트 데이터를 생성할까요?</p>
+            <p className="text-sm text-slate-500 mt-1">
+              <b>현재 부스·신청·로그인 인원이 모두 삭제</b>되고 샘플 데이터로 교체됩니다.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => setConfirmSeed(false)}
+                className="flex-1 h-10 rounded-xl bg-slate-100 font-semibold"
+              >
+                취소
+              </button>
+              <button
+                disabled={working}
+                onClick={doSeed}
+                className="flex-1 h-10 rounded-xl bg-amber-500 text-white font-semibold disabled:opacity-50"
+              >
+                생성
               </button>
             </div>
           </div>

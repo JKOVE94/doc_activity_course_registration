@@ -11,9 +11,9 @@
 
 | 경로 | 설명 |
 |---|---|
-| `/` | 간이 로그인 (목장 선택 + 이름). 우하단 `관리자 모드` 링크 |
+| `/` | 간이 로그인 (목장 선택 + 이름). 하단 `실시간 현황판` · `관리자 모드` 링크. 세션은 브라우저에 유지 |
 | `/booths` | 부스 소개 (담당자/설명/장소/준비물/사진) |
-| `/register` | 실시간 수강신청 — 정원 현황, 프로그레스 바, 1인 1부스 |
+| `/register` | 실시간 수강신청 — 정원 현황, 프로그레스 바, 1인 1부스. 오픈 전 `이름 변경` 가능 |
 | `/board` | 실시간 현황판 (인증 불필요, 큰 화면/프로젝터용) — 부스별 정원·신청 인원·신청자 명단 |
 | `/admin` | 관리자 대시보드 — 부스 관리(추가·수정·삭제, 사진 3장) / 상태 토글 / 명단 / CSV / 전체 초기화 |
 
@@ -23,12 +23,21 @@
 `ceil(로그인 인원 ÷ 부스 수)`를 계산해 모든 부스에 동일한 정원으로 고정합니다.
 (로그인 시 `/api/login` → `attendees` 테이블 기록. '대기'→'오픈'을 다시 하면 그 시점 인원으로 재계산.)
 
-## 동시성(Race Condition) 처리
+## 동시성 · 성능 (80~100명 동시 신청)
 
-`register_for_class()` DB 함수가 대상 클래스 row 를 `SELECT ... FOR UPDATE` 로 잠급니다.
-같은 부스에 대한 동시 신청은 DB 레벨에서 직렬화되므로, 정원이 1자리 남은 상태에서
-여러 명이 동시에 눌러도 **초과 신청이 발생하지 않습니다.**
-`registrations (ranch_name, user_name)` 유니크 인덱스가 1인 1클래스를 추가로 강제합니다.
+**정원 초과 방지** — `register_for_class()` 가 조건부 원자 UPDATE 로 정원을 확보합니다:
+`UPDATE classes SET current_count = current_count + 1 WHERE id = ? AND current_count < max_capacity`.
+동시 트랜잭션은 커밋된 최신값으로 WHERE 를 재평가하므로 정원을 넘길 수 없고,
+행 락은 이 한 문장 동안만 유지됩니다(임계구역 최소화). `lock_timeout`/`statement_timeout`
+으로 폭주 시 빠르게 실패(`BUSY`)합니다. `registrations(ranch_name, user_name)` 유니크
+인덱스가 1인 1부스를 이중으로 강제합니다.
+
+**읽기 부하** — 공개 화면은 `GET /api/snapshot` 하나만 폴링하며 Vercel CDN 이 2초
+캐시(+SWR)합니다. 접속자가 80명이든 800명이든 원본 DB 에는 초당 1회 미만으로만
+요청이 갑니다. Realtime 이벤트는 클라이언트에서 1~1.2초로 합쳐(debounce) 재조회 폭주를 막습니다.
+
+**기타** — 함수 리전 `icn1`(서울), 이미지 `immutable` + 조건부요청(304) 캐시,
+로그인 인원 기록은 세션당 1회.
 
 모든 쓰기는 서버 API Route(secret key)를 거쳐 DB 함수로만 실행되며,
 클라이언트는 테이블을 읽고 Realtime 구독만 합니다 (RLS 로 직접 쓰기 차단).
@@ -56,7 +65,11 @@ Vercel 에서 이 두 변수는 "Config"(비민감)로, `SUPABASE_SECRET_KEY` �
    - `supabase/migrations/0004_dynamic_capacity.sql` (정원 자동 산정 + 로그인 인원 기록)
    - `supabase/migrations/0005_public_snapshot.sql` (공개 화면 통합 조회 함수 — 로딩 속도)
    - `supabase/migrations/0006_safe_where.sql` (pg_safeupdate 대응 — reset/오픈 함수 WHERE 보강)
-3. (선택) `supabase/seed.sql` 실행해 샘플 부스 6개 삽입 — 실제 부스는 관리자 페이지에서 추가
+   - `supabase/migrations/0007_reset_feedback.sql` (초기화 삭제 건수 반환)
+   - `supabase/migrations/0008_reset_scope_and_demo.sql` (초기화에 부스 포함 + 테스트 데이터 생성 함수)
+   - `supabase/migrations/0009_register_perf.sql` (신청/취소 동시성 최적화)
+   - `supabase/migrations/0010_attendee_rename.sql` (일반 유저 이름/목장 변경)
+3. 실제 부스는 관리자 페이지 &lsquo;부스 관리&rsquo;에서 추가. 테스트는 관리자 &lsquo;테스트 데이터 생성&rsquo; 버튼으로 샘플 세팅.
 4. 관리자 비밀번호 변경:
    ```sql
    update public.admin_secret set password = '원하는비밀번호' where id = 1;

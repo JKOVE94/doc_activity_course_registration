@@ -41,6 +41,7 @@ export const REGISTER_ERROR_MESSAGE: Record<string, string> = {
   CLASS_NOT_FOUND: "존재하지 않는 분반입니다.",
   ALREADY_REGISTERED: "이미 다른 분반에 신청되어 있습니다. 취소 후 다시 신청해 주세요.",
   FULL: "정원이 마감되었습니다.",
+  BUSY: "신청이 몰리고 있어요. 잠시 후 다시 눌러 주세요.",
   NO_REGISTRATION: "신청 내역이 없습니다.",
   BAD_PASSWORD: "관리자 비밀번호가 올바르지 않습니다.",
   NO_CLASSES: "등록된 부스가 없습니다. 부스를 먼저 추가하세요.",

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { MapPin, User, Package, Users, UserPlus } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
 import type { ClassRow, ClassImageMeta } from "@/lib/types";
 import TabNav from "@/components/TabNav";
 import ImageStrip from "@/components/ImageStrip";
@@ -14,16 +13,19 @@ export default function BoothsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.rpc("get_public_snapshot").then(({ data, error }) => {
-      if (!error && data) {
-        setRows((data.classes as ClassRow[]) ?? []);
-        setImages((data.images as ClassImageMeta[]) ?? []);
-        setCapacity(
-          data.status === "OPEN" ? (data.capacity_per_class as number | null) : null,
-        );
-      }
-      setLoading(false);
-    });
+    fetch("/api/snapshot", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && !data.error) {
+          setRows((data.classes as ClassRow[]) ?? []);
+          setImages((data.images as ClassImageMeta[]) ?? []);
+          setCapacity(
+            data.status === "OPEN" ? (data.capacity_per_class as number | null) : null,
+          );
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   const imageIds = (classId: string) =>
