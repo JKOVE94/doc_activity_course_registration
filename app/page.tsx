@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { ShieldCheck, MonitorPlay } from "lucide-react";
 import { RANCHES } from "@/lib/constants";
 import { useUser } from "@/lib/useUser";
 
@@ -13,15 +14,11 @@ export default function LoginPage() {
   const [ranch, setRanch] = useState("");
   const [name, setName] = useState("");
   const [err, setErr] = useState("");
-
-  const [adminOpen, setAdminOpen] = useState(false);
-  const [pin, setPin] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (ready && user) router.replace("/register");
   }, [ready, user, router]);
-
-  const [submitting, setSubmitting] = useState(false);
 
   const submit = async () => {
     if (!ranch) return setErr("목장을 선택해 주세요.");
@@ -97,44 +94,15 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <button
-          onClick={() => setAdminOpen(true)}
-          className="mx-auto mt-6 flex items-center gap-1 text-xs text-slate-400"
-        >
-          <ShieldCheck size={14} /> 관리자 모드
-        </button>
-      </div>
-
-      {adminOpen && (
-        <div
-          className="fixed inset-0 z-20 bg-black/40 flex items-center justify-center px-5"
-          onClick={() => setAdminOpen(false)}
-        >
-          <div
-            className="w-full max-w-xs rounded-2xl bg-white p-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="font-bold text-slate-800">관리자 인증</h2>
-            <input
-              type="password"
-              inputMode="numeric"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              onKeyDown={(e) =>
-                e.key === "Enter" && router.push(`/admin?k=${encodeURIComponent(pin)}`)
-              }
-              placeholder="관리자 비밀번호"
-              className="mt-3 w-full h-11 rounded-xl border border-slate-300 px-3"
-            />
-            <button
-              onClick={() => router.push(`/admin?k=${encodeURIComponent(pin)}`)}
-              className="mt-3 w-full h-11 rounded-xl bg-slate-800 text-white font-semibold"
-            >
-              들어가기
-            </button>
-          </div>
+        <div className="mt-6 flex items-center justify-center gap-5 text-xs text-slate-400">
+          <Link href="/board" className="flex items-center gap-1">
+            <MonitorPlay size={14} /> 실시간 현황판
+          </Link>
+          <Link href="/admin" className="flex items-center gap-1">
+            <ShieldCheck size={14} /> 관리자 모드
+          </Link>
         </div>
-      )}
+      </div>
     </main>
   );
 }
