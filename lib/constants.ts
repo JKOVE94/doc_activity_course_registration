@@ -1,15 +1,29 @@
-// 목장 목록 — 실제 목장 구성에 맞게 수정하세요.
+// 목장 목록
 export const RANCHES = [
-  "1목장",
-  "2목장",
-  "3목장",
-  "4목장",
-  "5목장",
-  "6목장",
-  "7목장",
-  "8목장",
-  "새가족 / 미편성 청년",
+  "김대현 목장",
+  "전경근 목장",
+  "윤주혜 목장",
+  "정은희 목장",
+  "이서연 목장",
+  "박민협 목장",
+  "이유리 목장",
+  "안병선 목장",
+  "채혜숙 목장",
+  "성현 목장",
+  "윤다솔 목장",
+  "이상원 목장",
 ] as const;
+
+// 이름: 한글(완성형) 2~10자
+export const NAME_PATTERN = /^[가-힣]{2,10}$/;
+
+export function isValidName(name: string): boolean {
+  return NAME_PATTERN.test((name ?? "").trim());
+}
+
+export function isValidRanch(ranch: string): boolean {
+  return (RANCHES as readonly string[]).includes((ranch ?? "").trim());
+}
 
 export type SystemStatus = "CLOSED" | "OPEN" | "FINISHED";
 
@@ -21,6 +35,7 @@ export const STATUS_LABEL: Record<SystemStatus, string> = {
 
 export const REGISTER_ERROR_MESSAGE: Record<string, string> = {
   INVALID_INPUT: "목장과 이름을 다시 확인해 주세요.",
+  INVALID_NAME: "이름은 한글 2글자 이상으로 입력해 주세요.",
   NOT_OPEN: "지금은 신청 기간이 아닙니다.",
   CLASS_NOT_FOUND: "존재하지 않는 분반입니다.",
   ALREADY_REGISTERED: "이미 다른 분반에 신청되어 있습니다. 취소 후 다시 신청해 주세요.",

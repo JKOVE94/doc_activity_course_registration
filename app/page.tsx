@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ShieldCheck, MonitorPlay } from "lucide-react";
-import { RANCHES } from "@/lib/constants";
+import { RANCHES, isValidName } from "@/lib/constants";
 import { useUser } from "@/lib/useUser";
 
 export default function LoginPage() {
@@ -23,6 +23,7 @@ export default function LoginPage() {
   const submit = async () => {
     if (!ranch) return setErr("목장을 선택해 주세요.");
     if (!name.trim()) return setErr("이름을 입력해 주세요.");
+    if (!isValidName(name)) return setErr("이름은 한글 2글자 이상으로 입력해 주세요.");
     const u = { ranchName: ranch, userName: name.trim() };
     setSubmitting(true);
     // 로그인 인원 기록 (정원 산정 기준). 실패해도 입장은 막지 않는다.
@@ -74,13 +75,16 @@ export default function LoginPage() {
             <input
               value={name}
               onChange={(e) => {
-                setName(e.target.value);
+                // 한글(완성형·자모)만 남김
+                setName(e.target.value.replace(/[^가-힣ㄱ-ㅎㅏ-ㅣ]/g, ""));
                 setErr("");
               }}
               onKeyDown={(e) => e.key === "Enter" && submit()}
               placeholder="홍길동"
+              maxLength={10}
               className="w-full h-12 rounded-xl border border-slate-300 px-3"
             />
+            <p className="mt-1 text-xs text-slate-400">한글 2글자 이상</p>
           </div>
 
           {err && <p className="text-sm text-red-500">{err}</p>}

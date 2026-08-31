@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { isValidName, isValidRanch } from "@/lib/constants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,8 +16,11 @@ export async function POST(req: Request) {
 
   const ranchName = (body.ranchName ?? "").trim();
   const userName = (body.userName ?? "").trim();
-  if (!ranchName || !userName) {
+  if (!isValidRanch(ranchName)) {
     return NextResponse.json({ ok: false, error: "INVALID_INPUT" }, { status: 400 });
+  }
+  if (!isValidName(userName)) {
+    return NextResponse.json({ ok: false, error: "INVALID_NAME" }, { status: 400 });
   }
 
   const { data, error } = await supabaseAdmin.rpc("record_attendee", {
