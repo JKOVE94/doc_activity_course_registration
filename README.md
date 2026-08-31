@@ -14,7 +14,7 @@
 | `/` | 간이 로그인 (목장 선택 + 이름). 우하단 `관리자 모드` 링크 |
 | `/booths` | 부스 소개 (강사/설명/장소/준비물/정원) |
 | `/register` | 실시간 수강신청 — 정원 현황, 프로그레스 바, 1인 1클래스 |
-| `/admin` | 관리자 대시보드 — 상태 토글 / 명단 / CSV / 전체 초기화 |
+| `/admin` | 관리자 대시보드 — 부스 관리(추가·수정·삭제, 사진 3장) / 상태 토글 / 명단 / CSV / 전체 초기화 |
 
 ## 동시성(Race Condition) 처리
 
@@ -42,9 +42,11 @@ Vercel 에서 이 두 변수는 "Config"(비민감)로, `SUPABASE_SECRET_KEY` �
 
 ### 1. Supabase 프로젝트 생성
 1. <https://supabase.com/dashboard> 에서 새 프로젝트 생성
-2. **SQL Editor** → `supabase/migrations/0001_init.sql` 전체 실행
-   (0001 을 이미 예전 버전으로 돌렸다면 `0002_harden_rpc.sql` 추가 실행)
-3. (선택) `supabase/seed.sql` 실행해 샘플 부스 6개 삽입
+2. **SQL Editor** → 마이그레이션을 순서대로 실행:
+   - `supabase/migrations/0001_init.sql`
+   - `supabase/migrations/0002_harden_rpc.sql` (0001 을 이미 예전 버전으로 돌린 경우만)
+   - `supabase/migrations/0003_class_management.sql` (부스 GUI 관리 + 이미지 업로드)
+3. (선택) `supabase/seed.sql` 실행해 샘플 부스 6개 삽입 — 실제 부스는 관리자 페이지에서 추가
 4. 관리자 비밀번호 변경:
    ```sql
    update public.admin_secret set password = '원하는비밀번호' where id = 1;

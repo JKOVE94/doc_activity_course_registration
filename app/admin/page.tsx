@@ -6,6 +6,7 @@ import { Download, RotateCcw } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { STATUS_LABEL, type SystemStatus } from "@/lib/constants";
 import type { ClassRow, RegistrationRow } from "@/lib/types";
+import ClassManager from "@/components/admin/ClassManager";
 
 export default function AdminPage() {
   return (
@@ -206,6 +207,8 @@ function AdminInner() {
             &lsquo;오픈&rsquo; 시에만 신청/취소가 가능합니다. &lsquo;종료&rsquo; 시 전체 기능이 중단됩니다.
           </p>
         </section>
+
+        <ClassManager password={pw} classes={classes} onChanged={load} />
 
         <section className="rounded-2xl bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between">

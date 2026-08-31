@@ -147,12 +147,24 @@ export default function RegisterPage() {
               }`}
             >
               <div className="flex justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="font-bold text-slate-800 truncate">{c.name}</h3>
-                  <p className="text-xs text-slate-500 truncate">
-                    {c.instructor}
-                    {c.location ? ` · ${c.location}` : ""}
-                  </p>
+                <div className="flex items-center gap-3 min-w-0">
+                  {c.image_urls?.[0] && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={c.image_urls[0]}
+                      alt=""
+                      loading="lazy"
+                      className="h-12 w-12 rounded-lg object-cover bg-slate-100 shrink-0"
+                    />
+                  )}
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-slate-800 truncate">{c.name}</h3>
+                    <p className="text-xs text-slate-500 truncate">
+                      {c.instructor}
+                      {c.instructor_sub ? `·${c.instructor_sub}` : ""}
+                      {c.location ? ` · ${c.location}` : ""}
+                    </p>
+                  </div>
                 </div>
                 <span
                   className={`shrink-0 text-sm font-bold ${

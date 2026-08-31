@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapPin, User, Package, Users } from "lucide-react";
+import { MapPin, User, Package, Users, UserPlus } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import type { ClassRow } from "@/lib/types";
 import TabNav from "@/components/TabNav";
+import ImageStrip from "@/components/ImageStrip";
 
 export default function BoothsPage() {
   const [rows, setRows] = useState<ClassRow[]>([]);
@@ -32,17 +33,27 @@ export default function BoothsPage() {
         {loading && <p className="text-center text-slate-400 py-10">불러오는 중…</p>}
 
         {rows.map((c) => (
-          <div key={c.id} className="rounded-2xl bg-white p-4 shadow-sm">
+          <div key={c.id} className="rounded-2xl bg-white p-4 shadow-sm overflow-hidden">
             <h3 className="font-bold text-slate-800 text-lg">{c.name}</h3>
+            {c.image_urls?.length > 0 && (
+              <div className="mt-3">
+                <ImageStrip urls={c.image_urls} />
+              </div>
+            )}
             {c.description && (
-              <p className="text-sm text-slate-600 mt-1.5 whitespace-pre-line leading-relaxed">
+              <p className="text-sm text-slate-600 mt-3 whitespace-pre-line leading-relaxed">
                 {c.description}
               </p>
             )}
             <div className="mt-3 space-y-1.5 text-xs text-slate-500">
               <p className="flex items-center gap-1.5">
-                <User size={13} /> 강사 · {c.instructor}
+                <User size={13} /> 메인 · {c.instructor}
               </p>
+              {c.instructor_sub && (
+                <p className="flex items-center gap-1.5">
+                  <UserPlus size={13} /> 보조 · {c.instructor_sub}
+                </p>
+              )}
               {c.location && (
                 <p className="flex items-center gap-1.5">
                   <MapPin size={13} /> {c.location}
