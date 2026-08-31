@@ -19,7 +19,7 @@ export default function BoardPage() {
   const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
-    const [snapRes, { data: r }] = await Promise.all([
+    const [snapRes, regRes] = await Promise.all([
       fetch("/api/snapshot", { cache: "no-store" }).then((x) => x.json()).catch(() => null),
       supabase
         .from("registrations")
@@ -32,7 +32,10 @@ export default function BoardPage() {
       setCapacity((snapRes.capacity_per_class as number | null) ?? null);
       setAttendees((snapRes.attendees as number) ?? 0);
     }
-    setRegs((r as RegistrationRow[]) ?? []);
+    // 조회 실패 시 기존 명단 유지 (종료 시 realtime 폭주로 잠깐 빈 응답 → 명단 사라짐 방지)
+    if (!regRes.error && Array.isArray(regRes.data)) {
+      setRegs(regRes.data as RegistrationRow[]);
+    }
     setUpdatedAt(Date.now());
   }, []);
 

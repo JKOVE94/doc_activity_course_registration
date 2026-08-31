@@ -16,6 +16,7 @@ const EMPTY: ClassPayload = {
   description: "",
   location: "",
   materials: "",
+  capacity_cap: "",
 };
 
 type Props = {
@@ -49,6 +50,7 @@ export default function ClassManager({ password, classes, images, onChanged }: P
       description: c.description ?? "",
       location: c.location ?? "",
       materials: c.materials ?? "",
+      capacity_cap: c.capacity_cap != null ? String(c.capacity_cap) : "",
       sort_order: c.sort_order,
     });
   };
@@ -141,6 +143,7 @@ export default function ClassManager({ password, classes, images, onChanged }: P
                 <p className="text-xs text-slate-500 truncate">
                   {c.instructor}
                   {c.instructor_sub ? ` · ${c.instructor_sub}` : ""} · 사진 {imgCount(c.id)}
+                  {c.capacity_cap != null ? ` · 상한 ${c.capacity_cap}` : ""}
                 </p>
               </div>
               {deleteId === c.id ? (
@@ -372,8 +375,20 @@ function ClassFormModal({
             </Field>
           </div>
 
+          <Field label="정원 상한 (선택)">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              value={form.capacity_cap}
+              onChange={(e) => set("capacity_cap", e.target.value.replace(/[^0-9]/g, ""))}
+              className={INPUT_CLS}
+              placeholder="비우면 자동 정원"
+            />
+          </Field>
           <p className="text-xs text-slate-400">
-            정원은 신청 오픈 시 <b>로그인 인원 ÷ 부스 수</b>로 자동 계산돼 모든 부스에 동일하게 적용됩니다.
+            기본 정원은 오픈 시 <b>로그인 인원 ÷ 부스 수</b>(올림)로 자동 계산됩니다.
+            상한을 입력하면 이 부스는 그 값을 넘게 배정되지 않습니다(둘 중 작은 값 적용).
           </p>
 
           <div>

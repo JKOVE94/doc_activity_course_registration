@@ -7,6 +7,7 @@ export type ClassRow = {
   location: string | null;
   materials: string | null;
   max_capacity: number;
+  capacity_cap: number | null; // 정원 상한 (선택). null = 평균정원 사용
   current_count: number;
   sort_order: number;
 };
@@ -37,6 +38,7 @@ export type ClassPayload = {
   description: string;
   location: string;
   materials: string;
+  capacity_cap: string; // 빈 문자열 = 상한 없음
   sort_order?: number;
 };
 
