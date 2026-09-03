@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapPin, User, Package, Users, UserPlus } from "lucide-react";
+import { MapPin, User, Package, Users, UserPlus, Clock } from "lucide-react";
 import type { ClassRow, ClassImageMeta } from "@/lib/types";
 import TabNav from "@/components/TabNav";
 import ImageStrip from "@/components/ImageStrip";
+import Timetable from "@/components/Timetable";
 
 export default function BoothsPage() {
   const [rows, setRows] = useState<ClassRow[]>([]);
@@ -55,6 +56,14 @@ export default function BoothsPage() {
               <p className="text-sm text-slate-600 mt-3 whitespace-pre-line leading-relaxed">
                 {c.description}
               </p>
+            )}
+            {c.timetable?.length > 0 && (
+              <div className="mt-3 rounded-xl bg-slate-50 p-3">
+                <p className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1">
+                  <Clock size={12} /> 진행 순서
+                </p>
+                <Timetable slots={c.timetable} />
+              </div>
             )}
             <div className="mt-3 space-y-1.5 text-xs text-slate-500">
               <p className="flex items-center gap-1.5">

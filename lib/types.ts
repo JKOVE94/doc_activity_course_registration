@@ -1,3 +1,5 @@
+export type TimeSlot = { start: string; end: string; activity: string };
+
 export type ClassRow = {
   id: string;
   name: string;
@@ -8,6 +10,7 @@ export type ClassRow = {
   materials: string | null;
   max_capacity: number;
   capacity_cap: number | null; // 정원 상한 (선택). null = 평균정원 사용
+  timetable: TimeSlot[];
   current_count: number;
   sort_order: number;
 };
@@ -39,6 +42,7 @@ export type ClassPayload = {
   location: string;
   materials: string;
   capacity_cap: string; // 빈 문자열 = 상한 없음
+  timetable: TimeSlot[];
   sort_order?: number;
 };
 
