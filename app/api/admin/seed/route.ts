@@ -13,6 +13,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "INVALID_INPUT" }, { status: 400 });
   }
 
+  const { data: isDev } = await supabaseAdmin.rpc("admin_is_dev", {
+    p_password: body.password ?? "",
+  });
+  if (isDev !== true) {
+    return NextResponse.json({ ok: false, error: "BAD_PASSWORD" }, { status: 401 });
+  }
+
   const scenario =
     body.scenario === "classes" || body.scenario === "lastseat"
       ? body.scenario
