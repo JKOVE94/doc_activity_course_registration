@@ -28,6 +28,7 @@ function AdminInner() {
 
   const [pw, setPw] = useState(keyParam);
   const [authed, setAuthed] = useState(false);
+  const [isDev, setIsDev] = useState(false);
   const [authErr, setAuthErr] = useState("");
 
   const [classes, setClasses] = useState<ClassRow[]>([]);
@@ -37,6 +38,7 @@ function AdminInner() {
   const [capacityPerClass, setCapacityPerClass] = useState<number | null>(null);
   const [attendeeTotal, setAttendeeTotal] = useState(0);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const [confirmSeed, setConfirmSeed] = useState<
     "classes" | "full" | "lastseat" | null
   >(null);
@@ -70,7 +72,8 @@ function AdminInner() {
     const saved = loadAdminSession();
     if (!saved) return;
     /* eslint-disable react-hooks/set-state-in-effect */
-    setPw(saved);
+    setPw(saved.pw);
+    setIsDev(saved.dev);
     setAuthed(true);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
@@ -114,7 +117,8 @@ function AdminInner() {
       });
       const j = await res.json();
       if (j.ok) {
-        saveAdminSession(pw);
+        saveAdminSession(pw, !!j.dev);
+        setIsDev(!!j.dev);
         setAuthed(true);
       } else if (j.error === "SERVER") {
         setAuthErr("서버 오류입니다. 환경변수(SUPABASE_SECRET_KEY) 설정을 확인하세요.");
@@ -254,9 +258,40 @@ function AdminInner() {
     }
   };
 
+  const doClear = async () => {
+    setWorking(true);
+    try {
+      const res = await fetch("/api/admin/clear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw }),
+      });
+      const j = await res.json().catch(() => null);
+      if (j?.ok) {
+        touchAdminSession();
+        setConfirmClear(false);
+        await load();
+        alert(`참가자 초기화 완료 — 신청 ${j.deleted ?? 0}건 삭제 (부스·로그인 인원 유지)`);
+      } else {
+        alert(
+          j?.detail
+            ? `초기화 실패: ${j.detail}`
+            : j?.error === "BAD_PASSWORD"
+              ? "관리자 비밀번호가 올바르지 않습니다."
+              : "참가자 초기화에 실패했습니다.",
+        );
+      }
+    } catch (e) {
+      alert(`요청 실패: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setWorking(false);
+    }
+  };
+
   const logout = () => {
     clearAdminSession();
     setPw("");
+    setIsDev(false);
     setAuthed(false);
     setAuthErr("");
   };
@@ -447,51 +482,68 @@ function AdminInner() {
           </div>
         </section>
 
-        <section className="rounded-2xl bg-amber-50 border border-amber-100 p-4">
-          <h2 className="font-bold text-amber-700">테스트 도구</h2>
-          <p className="text-xs text-amber-600/80 mt-0.5">
-            기존 데이터를 모두 지우고 샘플 데이터를 생성합니다.
-          </p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button
-              onClick={() => setConfirmSeed("classes")}
-              className="flex items-center justify-center gap-1.5 h-11 rounded-xl bg-amber-100 text-amber-700 font-semibold text-sm"
-            >
-              <FlaskConical size={14} /> 부스만 생성
-            </button>
-            <button
-              onClick={() => setConfirmSeed("full")}
-              className="flex items-center justify-center gap-1.5 h-11 rounded-xl bg-amber-500 text-white font-semibold text-sm"
-            >
-              <FlaskConical size={14} /> 부스 + 참가자
-            </button>
-            <button
-              onClick={() => setConfirmSeed("lastseat")}
-              className="col-span-2 flex items-center justify-center gap-1.5 h-11 rounded-xl bg-amber-100 text-amber-700 font-semibold text-sm"
-            >
-              <FlaskConical size={14} /> 분반당 1자리 남김 (테스터 4명용)
-            </button>
-          </div>
-          <p className="mt-2 text-[11px] text-amber-600/70">
-            · 부스만: 샘플 부스 6개 (참가자·신청 없음)
-            <br />· 부스 + 참가자: 부스 6개 + 가짜 로그인 40명 + 랜덤 신청 약 60%
-            <br />· 분반당 1자리: 부스 6개 + 가짜 로그인 8명, 정원 2 중 1명 신청.
-            테스터가 로그인 후 오픈하면 마지막 1자리 선착순을 테스트할 수 있음
-          </p>
-        </section>
-
-        <section className="rounded-2xl bg-red-50 border border-red-100 p-4">
-          <h2 className="font-bold text-red-700">위험 구역</h2>
-          <p className="text-xs text-red-500/80 mt-0.5">
-            모든 부스·신청·로그인 인원이 삭제되고 상태가 &lsquo;대기&rsquo;로 초기화됩니다.
+        <section className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+          <h2 className="font-bold text-slate-800">참가자 초기화</h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            모든 부스의 <b>신청 내역만</b> 삭제합니다. 부스 정보와 로그인 인원은 유지됩니다.
           </p>
           <button
-            onClick={() => setConfirmReset(true)}
-            className="mt-3 flex items-center justify-center gap-1.5 h-11 w-full rounded-xl bg-red-600 text-white font-semibold"
+            onClick={() => setConfirmClear(true)}
+            className="mt-3 flex items-center justify-center gap-1.5 h-11 w-full rounded-xl bg-slate-800 text-white font-semibold"
           >
-            <RotateCcw size={15} /> 전체 초기화 (부스 포함)
+            <RotateCcw size={15} /> 신청 내역 초기화
           </button>
         </section>
+
+        {isDev && (
+          <>
+            <section className="rounded-2xl bg-amber-50 border border-amber-100 p-4">
+              <h2 className="font-bold text-amber-700">테스트 도구 (dev)</h2>
+              <p className="text-xs text-amber-600/80 mt-0.5">
+                기존 데이터를 모두 지우고 샘플 데이터를 생성합니다.
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setConfirmSeed("classes")}
+                  className="flex items-center justify-center gap-1.5 h-11 rounded-xl bg-amber-100 text-amber-700 font-semibold text-sm"
+                >
+                  <FlaskConical size={14} /> 부스만 생성
+                </button>
+                <button
+                  onClick={() => setConfirmSeed("full")}
+                  className="flex items-center justify-center gap-1.5 h-11 rounded-xl bg-amber-500 text-white font-semibold text-sm"
+                >
+                  <FlaskConical size={14} /> 부스 + 참가자
+                </button>
+                <button
+                  onClick={() => setConfirmSeed("lastseat")}
+                  className="col-span-2 flex items-center justify-center gap-1.5 h-11 rounded-xl bg-amber-100 text-amber-700 font-semibold text-sm"
+                >
+                  <FlaskConical size={14} /> 분반당 1자리 남김 (테스터 4명용)
+                </button>
+              </div>
+              <p className="mt-2 text-[11px] text-amber-600/70">
+                · 부스만: 샘플 부스 6개 (참가자·신청 없음)
+                <br />· 부스 + 참가자: 부스 6개 + 가짜 로그인 40명 + 랜덤 신청 약 60%
+                <br />· 분반당 1자리: 부스 6개 + 가짜 로그인 8명, 정원 2 중 1명 신청.
+                테스터가 로그인 후 오픈하면 마지막 1자리 선착순을 테스트할 수 있음
+              </p>
+            </section>
+
+            <section className="rounded-2xl bg-red-50 border border-red-100 p-4">
+              <h2 className="font-bold text-red-700">위험 구역 (dev)</h2>
+              <p className="text-xs text-red-500/80 mt-0.5">
+                모든 부스·신청·로그인 인원이 삭제되고 상태가 &lsquo;대기&rsquo;로 초기화됩니다.
+              </p>
+              <button
+                onClick={() => setConfirmReset(true)}
+                className="mt-3 flex items-center justify-center gap-1.5 h-11 w-full rounded-xl bg-red-600 text-white font-semibold"
+              >
+                <RotateCcw size={15} /> 전체 초기화 (부스 포함)
+              </button>
+            </section>
+          </>
+        )}
       </div>
 
       {confirmOpen && (
@@ -526,6 +578,33 @@ function AdminInner() {
                 className="flex-1 h-10 rounded-xl bg-blue-600 text-white font-semibold disabled:opacity-50"
               >
                 오픈
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmClear && (
+        <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center px-5">
+          <div className="w-full max-w-xs rounded-2xl bg-white p-5">
+            <p className="font-bold text-slate-800">신청 내역을 초기화할까요?</p>
+            <p className="text-sm text-slate-500 mt-1">
+              현재 신청 <b>{totalRegistered}건</b>이 모두 삭제됩니다. 부스와 로그인 인원은 그대로입니다.
+              필요하면 먼저 CSV로 내보내세요.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => setConfirmClear(false)}
+                className="flex-1 h-10 rounded-xl bg-slate-100 font-semibold"
+              >
+                취소
+              </button>
+              <button
+                disabled={working}
+                onClick={doClear}
+                className="flex-1 h-10 rounded-xl bg-slate-800 text-white font-semibold disabled:opacity-50"
+              >
+                초기화
               </button>
             </div>
           </div>
