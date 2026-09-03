@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Plus, Pencil, Trash2, X, ImagePlus, Loader2 } from "lucide-react";
-import type { ClassRow, ClassPayload, ClassImageMeta } from "@/lib/types";
+import { Plus, Pencil, Trash2, X, ImagePlus, Loader2, Clock } from "lucide-react";
+import type { ClassRow, ClassPayload, ClassImageMeta, TimeSlot } from "@/lib/types";
+import { TIME_OPTIONS, addMinutes } from "@/lib/time";
 
 const MAX_IMAGES = 3;
 const INPUT_CLS = "w-full h-11 rounded-xl border border-slate-300 px-3 text-base";
@@ -17,7 +18,15 @@ const EMPTY: ClassPayload = {
   location: "",
   materials: "",
   capacity_cap: "",
+  timetable: [],
 };
+
+// 일정을 앞뒤로 이어지게 재정렬 (일정 N 시작 = 일정 N-1 종료)
+function rechain(slots: TimeSlot[]): TimeSlot[] {
+  return slots.map((s, i) =>
+    i === 0 ? s : { ...s, start: slots[i - 1].end },
+  );
+}
 
 type Props = {
   password: string;
@@ -51,6 +60,7 @@ export default function ClassManager({ password, classes, images, onChanged }: P
       location: c.location ?? "",
       materials: c.materials ?? "",
       capacity_cap: c.capacity_cap != null ? String(c.capacity_cap) : "",
+      timetable: Array.isArray(c.timetable) ? c.timetable : [],
       sort_order: c.sort_order,
     });
   };
@@ -391,6 +401,11 @@ function ClassFormModal({
             상한을 입력하면 이 부스는 그 값을 넘게 배정되지 않습니다(둘 중 작은 값 적용).
           </p>
 
+          <TimetableEditor
+            slots={form.timetable}
+            onChange={(tt) => set("timetable", tt)}
+          />
+
           <div>
             <p className="text-xs font-medium text-slate-600 mb-1.5">
               사진 ({images.length}/{MAX_IMAGES})
@@ -481,5 +496,108 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="block text-xs font-medium text-slate-600 mb-1">{label}</span>
       {children}
     </label>
+  );
+}
+
+const TIME_SEL_CLS = "h-9 rounded-lg border border-slate-300 px-1.5 text-sm bg-white";
+
+function TimetableEditor({
+  slots,
+  onChange,
+}: {
+  slots: TimeSlot[];
+  onChange: (s: TimeSlot[]) => void;
+}) {
+  const startTime = slots[0]?.start ?? "17:00";
+
+  const setStart = (t: string) => {
+    if (slots.length === 0) return;
+    onChange(rechain([{ ...slots[0], start: t }, ...slots.slice(1)]));
+  };
+  const setEnd = (i: number, t: string) => {
+    const next = slots.map((s, idx) => (idx === i ? { ...s, end: t } : s));
+    onChange(rechain(next));
+  };
+  const setActivity = (i: number, t: string) => {
+    onChange(slots.map((s, idx) => (idx === i ? { ...s, activity: t } : s)));
+  };
+  const addSlot = () => {
+    const from = slots.length ? slots[slots.length - 1].end : startTime;
+    onChange([...slots, { start: from, end: addMinutes(from, 20), activity: "" }]);
+  };
+  const removeSlot = (i: number) => {
+    onChange(rechain(slots.filter((_, idx) => idx !== i)));
+  };
+
+  return (
+    <div>
+      <p className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
+        <Clock size={13} /> 타임테이블 (선택)
+      </p>
+
+      {slots.length > 0 && (
+        <div className="mb-2 flex items-center gap-1.5 text-xs text-slate-500">
+          시작
+          <select
+            value={startTime}
+            onChange={(e) => setStart(e.target.value)}
+            className={TIME_SEL_CLS}
+          >
+            {TIME_OPTIONS.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <div className="space-y-1.5">
+        {slots.map((s, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <span className="w-11 shrink-0 text-xs tabular-nums text-slate-400 text-right">
+              {s.start}
+            </span>
+            <span className="text-slate-300 text-xs">~</span>
+            <select
+              value={s.end}
+              onChange={(e) => setEnd(i, e.target.value)}
+              className={`${TIME_SEL_CLS} shrink-0`}
+            >
+              {TIME_OPTIONS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <input
+              value={s.activity}
+              onChange={(e) => setActivity(i, e.target.value)}
+              placeholder="활동 내용"
+              className="min-w-0 flex-1 h-9 rounded-lg border border-slate-300 px-2 text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => removeSlot(i)}
+              className="shrink-0 p-1 text-slate-400"
+              aria-label="일정 삭제"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={addSlot}
+        className="mt-2 flex items-center gap-1 text-xs font-medium text-blue-600"
+      >
+        <Plus size={13} /> 일정 추가
+      </button>
+      <p className="mt-1 text-[11px] text-slate-400">
+        각 일정의 시작 시각은 앞 일정의 종료 시각과 자동으로 이어집니다.
+      </p>
+    </div>
   );
 }

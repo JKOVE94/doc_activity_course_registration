@@ -226,6 +226,9 @@ export default function RegisterPage() {
                       {c.instructor}
                       {c.instructor_sub ? `·${c.instructor_sub}` : ""}
                       {c.location ? ` · ${c.location}` : ""}
+                      {c.timetable?.length > 0
+                        ? ` · ${c.timetable[0].start}–${c.timetable[c.timetable.length - 1].end}`
+                        : ""}
                     </p>
                   </div>
                 </div>
