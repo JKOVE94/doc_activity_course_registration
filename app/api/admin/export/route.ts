@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { resolveAdmin, tokenFrom } from "@/lib/adminAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,18 +14,16 @@ type Row = {
 };
 
 export async function POST(req: Request) {
-  let body: { password?: string };
+  let body: { token?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ ok: false, error: "INVALID_INPUT" }, { status: 400 });
   }
 
-  const { data: ok, error: verifyError } = await supabaseAdmin.rpc("admin_verify", {
-    p_password: body.password ?? "",
-  });
-  if (verifyError || !ok) {
-    return NextResponse.json({ ok: false, error: "BAD_PASSWORD" }, { status: 401 });
+  const admin = await resolveAdmin(tokenFrom(req, body));
+  if (!admin) {
+    return NextResponse.json({ ok: false, error: "AUTH" }, { status: 401 });
   }
 
   const { data, error } = await supabaseAdmin
