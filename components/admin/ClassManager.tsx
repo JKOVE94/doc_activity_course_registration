@@ -29,13 +29,13 @@ function rechain(slots: TimeSlot[]): TimeSlot[] {
 }
 
 type Props = {
-  password: string;
+  token: string;
   classes: ClassRow[];
   images: ClassImageMeta[];
   onChanged: () => void | Promise<void>;
 };
 
-export default function ClassManager({ password, classes, images, onChanged }: Props) {
+export default function ClassManager({ token, classes, images, onChanged }: Props) {
   const [form, setForm] = useState<ClassPayload | null>(null);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -77,7 +77,7 @@ export default function ClassManager({ password, classes, images, onChanged }: P
       const res = await fetch("/api/admin/classes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password, class: form }),
+        body: JSON.stringify({ token, class: form }),
       });
       const j = await res.json();
       if (j.ok) {
@@ -107,7 +107,7 @@ export default function ClassManager({ password, classes, images, onChanged }: P
       const res = await fetch("/api/admin/classes", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password, id }),
+        body: JSON.stringify({ token, id }),
       });
       const j = await res.json();
       if (j.ok) {
@@ -210,7 +210,7 @@ export default function ClassManager({ password, classes, images, onChanged }: P
           onImagesChanged={onChanged}
           saving={saving}
           err={err}
-          password={password}
+          token={token}
         />
       )}
     </section>
@@ -248,7 +248,7 @@ function ClassFormModal({
   onImagesChanged,
   saving,
   err,
-  password,
+  token,
 }: {
   form: ClassPayload;
   setForm: (f: ClassPayload) => void;
@@ -258,7 +258,7 @@ function ClassFormModal({
   onImagesChanged: () => void | Promise<void>;
   saving: boolean;
   err: string;
-  password: string;
+  token: string;
 }) {
   const [uploading, setUploading] = useState(false);
   const [uploadErr, setUploadErr] = useState("");
@@ -275,7 +275,7 @@ function ClassFormModal({
     try {
       const blob = await downscale(file);
       const fd = new FormData();
-      fd.append("password", password);
+      fd.append("token", token);
       fd.append("classId", form.id);
       fd.append("file", new File([blob], "photo.jpg", { type: blob.type || "image/jpeg" }));
       const res = await fetch("/api/admin/images", { method: "POST", body: fd });
@@ -306,7 +306,7 @@ function ClassFormModal({
       const res = await fetch("/api/admin/images", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password, id }),
+        body: JSON.stringify({ token, id }),
       });
       if ((await res.json()).ok) await onImagesChanged();
       else alert("사진 삭제에 실패했습니다.");

@@ -44,6 +44,7 @@ export const REGISTER_ERROR_MESSAGE: Record<string, string> = {
   BUSY: "신청이 몰리고 있어요. 잠시 후 다시 눌러 주세요.",
   NO_REGISTRATION: "신청 내역이 없습니다.",
   BAD_PASSWORD: "관리자 비밀번호가 올바르지 않습니다.",
+  AUTH: "세션이 만료되었습니다. 로그아웃 후 다시 로그인하세요.",
   NO_CLASSES: "등록된 부스가 없습니다. 부스를 먼저 추가하세요.",
   NO_ATTENDEES: "로그인한 인원이 없습니다. 청년들이 로그인한 뒤 오픈하세요.",
   SERVER: "잠시 후 다시 시도해 주세요.",

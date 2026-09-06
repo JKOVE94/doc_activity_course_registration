@@ -8,12 +8,7 @@ import { supabase } from "@/lib/supabase/client";
 import { REGISTER_ERROR_MESSAGE, STATUS_LABEL, type SystemStatus } from "@/lib/constants";
 import type { ClassRow, RegistrationRow, ClassImageMeta } from "@/lib/types";
 import ClassManager from "@/components/admin/ClassManager";
-import {
-  loadAdminSession,
-  saveAdminSession,
-  touchAdminSession,
-  clearAdminSession,
-} from "@/lib/adminSession";
+import { loadAdminSession, saveAdminSession, clearAdminSession } from "@/lib/adminSession";
 
 export default function AdminPage() {
   return (
@@ -26,7 +21,8 @@ export default function AdminPage() {
 function AdminInner() {
   const keyParam = useSearchParams().get("k") ?? "";
 
-  const [pw, setPw] = useState(keyParam);
+  const [pw, setPw] = useState(keyParam); // 로그인 입력용 (저장 안 함)
+  const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
   const [isDev, setIsDev] = useState(false);
   const [authErr, setAuthErr] = useState("");
@@ -64,15 +60,33 @@ function AdminInner() {
     if (!regRes.error && Array.isArray(regRes.data)) {
       setRegs(regRes.data as RegistrationRow[]);
     }
-    touchAdminSession(); // 활동 중 세션 만료 연장
+
+    // 슬라이딩 세션: 만료 15분 이내면 토큰 갱신
+    const sess = loadAdminSession();
+    if (sess && sess.exp - Date.now() < 15 * 60 * 1000) {
+      try {
+        const r = await fetch("/api/admin/refresh", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: sess.token }),
+        });
+        const j = await r.json();
+        if (j.ok) {
+          saveAdminSession(j.token, !!j.dev, j.exp);
+          setToken(j.token);
+        }
+      } catch {
+        /* keep current */
+      }
+    }
   }, []);
 
-  // 새로고침 시 저장된 세션(30분) 복원
+  // 새로고침 시 저장된 세션 복원
   useEffect(() => {
     const saved = loadAdminSession();
     if (!saved) return;
     /* eslint-disable react-hooks/set-state-in-effect */
-    setPw(saved.pw);
+    setToken(saved.token);
     setIsDev(saved.dev);
     setAuthed(true);
     /* eslint-enable react-hooks/set-state-in-effect */
@@ -89,7 +103,6 @@ function AdminInner() {
         load();
       }, 1000);
     };
-    touchAdminSession();
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
     const channel = supabase
@@ -117,8 +130,10 @@ function AdminInner() {
       });
       const j = await res.json();
       if (j.ok) {
-        saveAdminSession(pw, !!j.dev);
+        saveAdminSession(j.token, !!j.dev, j.exp);
+        setToken(j.token);
         setIsDev(!!j.dev);
+        setPw("");
         setAuthed(true);
       } else if (j.error === "SERVER") {
         setAuthErr("서버 오류입니다. 환경변수(SUPABASE_SECRET_KEY) 설정을 확인하세요.");
@@ -143,11 +158,10 @@ function AdminInner() {
       const res = await fetch("/api/admin/status", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pw, status: next }),
+        body: JSON.stringify({ token, status: next }),
       });
       const j = await res.json();
       if (j.ok) {
-        touchAdminSession();
         setConfirmOpen(false);
         setStatus(next);
         await load();
@@ -175,7 +189,7 @@ function AdminInner() {
       const res = await fetch("/api/admin/reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pw }),
+        body: JSON.stringify({ token }),
       });
       const text = await res.text();
       let j: Record<string, unknown>;
@@ -186,7 +200,6 @@ function AdminInner() {
         return;
       }
       if (j.ok) {
-        touchAdminSession();
         setConfirmReset(false);
         await load();
         alert(
@@ -217,7 +230,7 @@ function AdminInner() {
       const res = await fetch("/api/admin/seed", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pw, scenario: confirmSeed }),
+        body: JSON.stringify({ token, scenario: confirmSeed }),
       });
       const text = await res.text();
       let j: Record<string, unknown>;
@@ -228,7 +241,6 @@ function AdminInner() {
         return;
       }
       if (j.ok) {
-        touchAdminSession();
         setConfirmSeed(null);
         await load();
         alert(
@@ -264,11 +276,10 @@ function AdminInner() {
       const res = await fetch("/api/admin/clear", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pw }),
+        body: JSON.stringify({ token }),
       });
       const j = await res.json().catch(() => null);
       if (j?.ok) {
-        touchAdminSession();
         setConfirmClear(false);
         await load();
         alert(`참가자 초기화 완료 — 신청 ${j.deleted ?? 0}건 삭제 (부스·로그인 인원 유지)`);
@@ -291,6 +302,7 @@ function AdminInner() {
   const logout = () => {
     clearAdminSession();
     setPw("");
+    setToken("");
     setIsDev(false);
     setAuthed(false);
     setAuthErr("");
@@ -300,7 +312,7 @@ function AdminInner() {
     const res = await fetch("/api/admin/export", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: pw }),
+      body: JSON.stringify({ token }),
     });
     if (!res.ok) return alert("다운로드에 실패했습니다.");
     const blob = await res.blob();
@@ -409,7 +421,7 @@ function AdminInner() {
         </section>
 
         <ClassManager
-          password={pw}
+          token={token}
           classes={classes}
           images={images}
           onChanged={load}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { resolveAdmin, tokenFrom } from "@/lib/adminAuth";
 import type { ClassPayload } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -7,15 +8,20 @@ export const dynamic = "force-dynamic";
 
 // 생성 / 수정 (payload.id 유무로 구분)
 export async function POST(req: Request) {
-  let body: { password?: string; class?: ClassPayload };
+  let body: { token?: string; class?: ClassPayload };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ ok: false, error: "INVALID_INPUT" }, { status: 400 });
   }
 
+  const admin = await resolveAdmin(tokenFrom(req, body));
+  if (!admin) {
+    return NextResponse.json({ ok: false, error: "AUTH" }, { status: 401 });
+  }
+
   const { data, error } = await supabaseAdmin.rpc("admin_upsert_class", {
-    p_password: body.password ?? "",
+    p_password: admin.password,
     p_payload: body.class ?? {},
   });
 
@@ -31,15 +37,20 @@ export async function POST(req: Request) {
 
 // 삭제
 export async function DELETE(req: Request) {
-  let body: { password?: string; id?: string };
+  let body: { token?: string; id?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ ok: false, error: "INVALID_INPUT" }, { status: 400 });
   }
 
+  const admin = await resolveAdmin(tokenFrom(req, body));
+  if (!admin) {
+    return NextResponse.json({ ok: false, error: "AUTH" }, { status: 401 });
+  }
+
   const { data, error } = await supabaseAdmin.rpc("admin_delete_class", {
-    p_password: body.password ?? "",
+    p_password: admin.password,
     p_id: body.id,
   });
 
