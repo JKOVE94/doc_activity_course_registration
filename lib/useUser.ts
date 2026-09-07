@@ -5,32 +5,69 @@ import { useCallback, useEffect, useState } from "react";
 export type User = { ranchName: string; userName: string };
 
 const KEY = "yf_user";
+const TTL_MS = 30 * 60 * 1000; // 30분 (슬라이딩)
+
+type Stored = User & { exp: number };
+
+function readStored(): User | null {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw) as Partial<Stored>;
+    if (
+      !s.ranchName ||
+      !s.userName ||
+      typeof s.exp !== "number" ||
+      Date.now() > s.exp
+    ) {
+      localStorage.removeItem(KEY);
+      return null;
+    }
+    return { ranchName: s.ranchName, userName: s.userName };
+  } catch {
+    return null;
+  }
+}
+
+function writeStored(u: User): void {
+  try {
+    localStorage.setItem(KEY, JSON.stringify({ ...u, exp: Date.now() + TTL_MS }));
+  } catch {
+    /* ignore */
+  }
+}
 
 export function useUser() {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // 마운트 시 1회 localStorage(외부 저장소)에서 세션 복원.
-    try {
-      const raw = localStorage.getItem(KEY);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (raw) setUser(JSON.parse(raw) as User);
-    } catch {
-      /* ignore */
-    }
+    const u = readStored();
+    if (u) writeStored(u); // 마운트 시 만료 연장
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setUser(u);
     setReady(true);
   }, []);
 
   const login = useCallback((u: User) => {
-    localStorage.setItem(KEY, JSON.stringify(u));
+    writeStored(u);
     setUser(u);
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem(KEY);
+    try {
+      localStorage.removeItem(KEY);
+    } catch {
+      /* ignore */
+    }
     setUser(null);
   }, []);
 
-  return { user, ready, login, logout };
+  // 활동 시 호출 → 세션 만료 30분 연장
+  const touch = useCallback(() => {
+    const u = readStored();
+    if (u) writeStored(u);
+  }, []);
+
+  return { user, ready, login, logout, touch };
 }

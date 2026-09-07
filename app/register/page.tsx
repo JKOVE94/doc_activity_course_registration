@@ -17,7 +17,7 @@ import TabNav from "@/components/TabNav";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { user, ready, login } = useUser();
+  const { user, ready, login, touch } = useUser();
 
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [images, setImages] = useState<ClassImageMeta[]>([]);
@@ -43,6 +43,7 @@ export default function RegisterPage() {
 
   // 전역 스냅샷 (CDN 2초 캐시) — 접속자 수와 무관하게 DB 부하 일정
   const refresh = useCallback(async () => {
+    touch(); // 활동 중 세션(30분) 연장
     try {
       const res = await fetch("/api/snapshot", { cache: "no-store" });
       const data = await res.json();
@@ -56,7 +57,7 @@ export default function RegisterPage() {
     } finally {
       setLoaded(true);
     }
-  }, []);
+  }, [touch]);
 
   // 내 신청 상태 (본인 액션으로만 바뀌므로 마운트 시 1회만 조회)
   const loadMine = useCallback(async () => {

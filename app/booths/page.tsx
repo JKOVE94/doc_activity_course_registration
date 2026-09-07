@@ -3,17 +3,20 @@
 import { useEffect, useState } from "react";
 import { MapPin, User, Package, Users, UserPlus, Clock } from "lucide-react";
 import type { ClassRow, ClassImageMeta } from "@/lib/types";
+import { useUser } from "@/lib/useUser";
 import TabNav from "@/components/TabNav";
 import ImageStrip from "@/components/ImageStrip";
 import Timetable from "@/components/Timetable";
 
 export default function BoothsPage() {
+  const { touch } = useUser();
   const [rows, setRows] = useState<ClassRow[]>([]);
   const [images, setImages] = useState<ClassImageMeta[]>([]);
   const [capacity, setCapacity] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    touch(); // 세션(30분) 연장
     fetch("/api/snapshot", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
@@ -27,7 +30,7 @@ export default function BoothsPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [touch]);
 
   const imageIds = (classId: string) =>
     images.filter((i) => i.class_id === classId).map((i) => i.id);
